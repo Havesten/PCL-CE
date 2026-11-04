@@ -8,6 +8,10 @@ public static class AnnouncementService
 {
     public static void Load()
     {
+        // 在线服务禁用时不再展示任何服务端公告
+        if (!UpdateManager.OnlineServiceEnabled)
+            return;
+
         if (States.System.AnnounceSolution > 1)
             return;
 

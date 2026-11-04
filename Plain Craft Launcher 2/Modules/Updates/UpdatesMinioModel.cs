@@ -19,7 +19,8 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
 
     public UpdatesMinioModel(string baseUrl, string name = "Minio")
     {
-        _baseUrl = baseUrl;
+        // 后续拼接的是 "{baseUrl}apiv2/..."，基地址少了结尾斜杠会拼成 ...pclce-apiapiv2/cache.json
+        _baseUrl = string.IsNullOrWhiteSpace(baseUrl) || baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/";
         SourceName = name;
     }
 

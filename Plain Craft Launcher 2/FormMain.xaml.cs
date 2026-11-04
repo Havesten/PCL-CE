@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -266,7 +266,7 @@ public partial class FormMain
                     {
                         Title = Lang.Text("Main.Eula.Title"),
                         Content = Lang.Text("Main.Eula.Message"),
-                        Buttons = DialogButtons.From(DialogButton.Create(Lang.Text("Common.Action.Agree")), DialogButton.Create(Lang.Text("Common.Action.Decline")), DialogButton.Create(Lang.Text("Main.Eula.View"), () => Common.OpenWebsite("https://shimo.im/docs/rGrd8pY8xWkt6ryW"))),
+                        Buttons = DialogButtons.From(DialogButton.Create(Lang.Text("Common.Action.Agree")), DialogButton.Create(Lang.Text("Common.Action.Decline")), DialogButton.Create(Lang.Text("Main.Eula.View"), () => Common.OpenWebsite("https://shimo.im/docs/rGrd8pY8xWkt6ryW"), keepOpen: true)),
                         ForceWait = true
                     }).Result?.Button ?? 0))
                     {
@@ -358,8 +358,6 @@ public partial class FormMain
         if ((int)Config.Launch.GameWindowMode == 5)
             Config.Launch.GameWindowMode = GameWindowSizeMode.Default;
 
-        // 更新后展示社区版提示
-        UpdateManager.ShowCEAnnounce();
         // 输出更新日志
         if (lastVersionCode <= 0)
             return;
@@ -1418,6 +1416,11 @@ public partial class FormMain
         Tools = 3,
 
         /// <summary>
+        ///     联机。P2P 与中继两种方式都放在这里。
+        /// </summary>
+        Link = 4,
+
+        /// <summary>
         ///     设置。
         /// </summary>
         Setup = 2,
@@ -1489,14 +1492,16 @@ public partial class FormMain
         SetupAbout = 4,
         SetupLog = 5,
         SetupFeedback = 6,
-        SetupGameLink = 7,
         SetupUpdate = 8,
         SetupJava = 9,
         SetupLauncherMisc = 10,
         SetupLauncherLanguage = 11,
+        SetupDownloadSource = 12,
 
-        ToolsGameLink = 1,
         ToolsTest = 3,
+
+        LinkP2P = 0, // 已从导航撤下，仅保留页面实现
+        LinkRelay = 1,
 
         VersionOverall = 0,
         VersionSetup = 1,
@@ -1911,6 +1916,13 @@ public partial class FormMain
                         Launcher.frmToolsLeft ??= new PageToolsLeft();
                         subType = Launcher.frmToolsLeft.pageID;
                         PageChangeAnim(Launcher.frmToolsLeft, (FrameworkElement)Launcher.frmToolsLeft.PageGet(subType));
+                        break;
+                    }
+                case PageType.Link: // 联机（中继）
+                    {
+                        Launcher.frmLinkLeft ??= new PageLinkLeft();
+                        subType = Launcher.frmLinkLeft.pageID;
+                        PageChangeAnim(Launcher.frmLinkLeft, (FrameworkElement)Launcher.frmLinkLeft.PageGet(subType));
                         break;
                     }
                 case PageType.Setup: // 设置

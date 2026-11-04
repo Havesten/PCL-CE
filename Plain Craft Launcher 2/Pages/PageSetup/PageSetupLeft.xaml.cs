@@ -30,7 +30,6 @@ public partial class PageSetupLeft : IPageView
         if (ItemLaunch.Checked && hide.SetupLaunch) isHiddenPage = true;
         if (ItemJava.Checked && hide.SetupJava) isHiddenPage = true;
         if (ItemGameManage.Checked && hide.SetupGameManage)  isHiddenPage = true;
-        if (ItemGameLink.Checked && hide.SetupGameLink) isHiddenPage = true;
         if (ItemUI.Checked && hide.SetupUi) isHiddenPage = true;
         if (ItemLauncherLanguage.Checked && hide.SetupLauncherLanguage) isHiddenPage = true;
         if (ItemLauncherMisc.Checked && hide.SetupLauncherMisc) isHiddenPage = true;
@@ -56,8 +55,6 @@ public partial class PageSetupLeft : IPageView
             ItemJava.SetChecked(true, false, false);
         else if (!hideCfg.SetupGameManage)
             ItemGameManage.SetChecked(true, false, false);
-        else if (!hideCfg.SetupGameLink)
-            ItemGameLink.SetChecked(true, false, false);
         else if (!hideCfg.SetupUi)
             ItemUI.SetChecked(true, false, false);
         else if (!hideCfg.SetupLauncherLanguage)
@@ -118,14 +115,6 @@ public partial class PageSetupLeft : IPageView
                         Launcher.frmSetupGameManage = new PageSetupGameManage();
                     Launcher.frmSetupGameManage.Reset();
                     ItemGameManage.Checked = true;
-                    break;
-                }
-                case FormMain.PageSubType.SetupGameLink:
-                {
-                    if (Launcher.frmSetupGameLink is null)
-                        Launcher.frmSetupGameLink = new PageSetupGameLink();
-                    Launcher.frmSetupGameLink.Reset();
-                    ItemGameLink.Checked = true;
                     break;
                 }
                 case FormMain.PageSubType.SetupLauncherLanguage:
@@ -266,6 +255,12 @@ public partial class PageSetupLeft : IPageView
                     Launcher.frmSetupGameManage = new PageSetupGameManage();
                 return Launcher.frmSetupGameManage;
             }
+            case FormMain.PageSubType.SetupDownloadSource:
+            {
+                if (Launcher.frmSetupDownloadSource is null)
+                    Launcher.frmSetupDownloadSource = new PageSetupDownloadSource();
+                return Launcher.frmSetupDownloadSource;
+            }
             case FormMain.PageSubType.SetupUpdate:
             {
                 if (Launcher.frmSetupUpdate is null)
@@ -289,12 +284,6 @@ public partial class PageSetupLeft : IPageView
                 if (Launcher.frmSetupFeedback is null)
                     Launcher.frmSetupFeedback = new PageSetupFeedback();
                 return Launcher.frmSetupFeedback;
-            }
-            case FormMain.PageSubType.SetupGameLink:
-            {
-                if (Launcher.frmSetupGameLink is null)
-                    Launcher.frmSetupGameLink = new PageSetupGameLink();
-                return Launcher.frmSetupGameLink;
             }
             case FormMain.PageSubType.SetupLauncherLanguage:
             {

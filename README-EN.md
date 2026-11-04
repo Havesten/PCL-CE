@@ -4,70 +4,145 @@
 
 <img src="Plain Craft Launcher 2/Images/icon.ico" alt="Logo" width="80" height="80">
 
-# PCL Community Edition
+# PCL CE FIX
 
-[![Stars](https://img.shields.io/github/stars/PCL-Community/PCL-CE?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=stars&labelColor=444444&color=eac54f)](https://github.com/PCL-Community/PCL-CE/)
-![GitHub Release](https://img.shields.io/github/v/release/PCL-Community/PCL-CE?label=release&logo=github&style=for-the-badge)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/PCL-Community/PCL-CE/build-test.yml?style=for-the-badge)
+A third-party fork of PCL Community Edition
 
-[![Issues](https://img.shields.io/github/issues/PCL-Community/PCL-CE?style=for-the-badge&label=issues&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Community/PCL-CE/issues)
-[![Pull requests](https://img.shields.io/github/issues-pr/PCL-Community/PCL-CE?style=for-the-badge&label=pull%20requests&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Community/PCL-CE/pulls)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/PCL-Community/PCL-CE/total?style=for-the-badge)
-[![Bilibili](https://img.shields.io/badge/Threads-bilibili-00A4DB?style=for-the-badge&labelColor=444444&logo=bilibili)](https://space.bilibili.com/3546847192811755/dynamic) <br />
+[Releases](https://github.com/Havesten/PCL-CE/releases) |
+[Community Edition upstream](https://github.com/PCL-Community/PCL-CE) |
+[Original author](https://github.com/Meloong-Git/PCL)
 
-<a href="https://trendshift.io/repositories/21800?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-21800" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/21800/daily?language=C%23" alt="PCL-Community%2FPCL-CE | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/21800" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21800" alt="PCL-Community%2FPCL-CE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-[download](https://github.com/PCL-Community/PCL-CE/releases/latest) |
-[Upstream repo](https://github.com/Meloong-Git/PCL)
-
-[Submit issues](https://github.com/PCL-Community/PCL-CE/issues/new/choose) |
-[Contribution Guidelines](https://github.com/PCL-Community/PCL-CE/wiki/开发指南)
+[Submit an issue](https://github.com/Havesten/PCL-CE/issues/new/choose) |
+[Changelog](https://github.com/Havesten/PCL-CE/releases)
 
 </div>
 
-PCL CE is a community edition developed as a secondary project based on PCL’s open-source code. It includes features and improvements that have not yet been implemented in the main branch.
+## What this is
 
-The version numbers of the community edition do not strictly correspond to those of the main branch, so please do not report community edition issues to the official repository.
+PCL (Plain Craft Launcher) is a Minecraft launcher by 龙腾猫跃 (Meloong). PCL CE is a community edition built on its open-source code.
 
-Everyone is welcome to try it out!
+This repository is a **third-party fork of PCL CE**, maintained independently by one person. It is not an official build of PCL or PCL CE, and it does not represent upstream in any way.
 
-**Developing group:** [599620549](https://qm.qq.com/q/PNQA4Md8wc) | **User group 1:** [1028074835](https://qm.qq.com/q/qrMGJo8BQQ) | **User group 2:** [1070029541](https://qm.qq.com/q/lBywbDMWhG)
+## Differences from upstream PCL CE
 
-## 💻 Supported Platforms
+### New: download node selection
 
-| Operating System | Support Status | Requirements |
-|---|---|---|
-| Windows 10 1809 (17763) or later | ✅ Fully supported | [.NET 10 Desktop Runtime](http://get.dot.net/10) |
-| Windows 8 to Windows 10 1809 (17763) | ⚠️ Expected to run; community support offered at discretion | [.NET 10 Desktop Runtime](http://get.dot.net/10) |
-| Windows 7 or earlier | ❌ Not supported | N/A |
-| macOS / Linux / Other OS | ⚠️ Cross-platform development only (cross-compilation) | [.NET 10 SDK](http://get.dot.net/10) |
+Upstream offers a binary choice between official and mirror sources. This build measures each candidate node's TCP and TLS handshake time, takes the median across several rounds to damp jitter, then pins the fastest one for subsequent requests. The URL, SNI and certificate validation all stay exactly as they were — only the IP the connection lands on changes.
 
-**✅ Fully supported**: We will provide as much support as possible, but you must ensure you are using the latest version of the launcher.
+Sixteen hosts are covered, in four groups:
 
-**⚠️ Expected to run; community support offered at discretion**: PCL CE is expected to run on these platforms, but full functionality is not guaranteed. You may need to upgrade to a fully supported OS version to receive further community technical support.
+| Group | Hosts |
+|---|---|
+| Mojang | piston-meta, launchermeta, launcher, resources and two more |
+| Mod loaders | Forge, NeoForge and Fabric mavens and list endpoints, five in total |
+| CurseForge | api, edge, mediafilez |
+| Modrinth | api, cdn |
 
-**❌ Not supported**: PCL CE may not be usable on these platforms and might not even launch at all. Please upgrade your OS to use PCL CE.
+Cloudflare-fronted hosts additionally switch to a shared preferred-IP pool (resolved from `cloudflare.182682.xyz`). The pool is probed once and reused by every CF host, since Cloudflare is anycast and one set of preferred IPs serves every domain behind it. Non-CF hosts (AWS CloudFront, Fastly, Azure) are detected and keep their own DNS answers.
 
-**⚠️ Cross-platform development only (cross-compilation)**: PCL CE’s source code can be built on macOS and Linux, but it cannot run directly. As a developer, you can develop on these platforms and then move the build artifacts to Windows for testing.
+Available under Settings → Download → Node selection.
 
-**Note**:     
-The community only supports the latest version of the launcher.    
-Depending on the nature of certain issues (e.g., an incomplete system environment), you may still need to upgrade your OS to continue receiving support.    
-PCL CE always recommends using the latest version of your OS for the best experience.    
-You can still try using the latest launcher version on unsupported platforms, but you may encounter many additional problems.
+### Changed: update source
 
-## 🔒 License
+- Removed the MirrorChyan beta channel and its CDK field
+- The update endpoint now points at a private server speaking the Minio-compatible protocol
+- No community announcement popup when online services are disabled
 
-- `Plain Craft Launcher 2/` uses [Custom License](https://github.com/PCL-Community/PCL-CE/blob/dev/Plain%20Craft%20Launcher%202/LICENCE)
-- `All other directories` use [Apache License 2.0](https://github.com/PCL-Community/PCL-CE/blob/dev/LICENSE)
+### Deleted & rebuilt: multiplayer
 
-## 🌟 Statistic
-![Alt](https://repobeats.axiom.co/api/embed/3e46296e6e3a134991a783480fd2f62723bb0353.svg "Repobeats analytics image")
+The old Lobby entry and the Natayark account login it depended on are gone — multiplayer was removed wholesale and rebuilt. It now sits in the title bar next to Launch, Download, Settings and Tools, and currently offers relay multiplayer.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=PCL-Community/PCL-CE&type=Date)](https://www.star-history.com/#PCL-Community/PCL-CE&Date)
+- **Relay multiplayer**: the host's local port is mapped to the public internet by a relay server, so no public IP is needed and two players behind NAT can still connect. Sign-in uses email + verification code (first sign-in registers, with a CAPTCHA); afterwards you can see monthly traffic, speed limit and port quota. Those limits are pushed and enforced server-side — editing local config cannot bypass them. The tunnel protocol is a custom PTP v1, built into both client and server, with no external binaries required
+- **P2P direct connect has been pulled**: the page implementation stays at `Pages/PageLink/PageLinkP2P` but no longer appears in navigation — pure direct connect needs a public IP on at least one side, so it always fails when both peers are behind NAT, too poor an experience for a default entry. Uncomment `ItemP2P` in `PageLinkLeft.xaml` to bring it back
 
-**Views** (Total / Today): [![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Community/PCL-CE)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Community/PCL-CE&web=true)
-## ❤️ Contributors
+### Changed: accounts
 
-[![](https://contrib.rocks/image?repo=PCL-Community/PCL-CE)](https://github.com/PCL-Community/PCL-CE/graphs/contributors)
+- Creating a profile now only offers "Microsoft account" and "third-party auth"; **the offline login entry is gone**. Existing offline profiles are unaffected and still launch fine
+
+### Changed: interface
+
+- Removed the persistent community notice card on the home page
+- Added a `FIX` mark after the title bar logo to distinguish this build from upstream
+- Default game window title is now `玩家：{user} 登录方式：{login} 版本：{version} 时间：{date} {time}`
+- The multiplayer entry inside Tools is gone — multiplayer lives only in the title-bar Multiplayer page
+- The P2P multiplayer page is temporarily hidden: navigation lists only "Relay multiplayer", and the multiplayer page opens straight onto the relay panel. The P2P page code and its room-code / peer-address / three-way protocol-stack logic are all kept as-is — uncomment `ItemP2P` in `PageLinkLeft.xaml` to restore it
+- The "Settings → Multiplayer (EasyTier)" page is deleted entirely: username, protocol preference, latency-first, symmetric-NAT port guessing and CLI debug output only took effect for EasyTier direct connect, and with that entry hidden there is no way to reach them. The matching checkboxes under Tools and Hidden features were removed with it
+
+## Features
+
+All of these come from upstream and are kept as-is:
+
+- Version install, modpack import, mod / resource pack / world management
+- Mod and resource downloads (CurseForge, Modrinth)
+- **Multiplayer**: EasyTier tunnel, public relay nodes and self-hosted relay server configuration (this fork rebuilt multiplayer on top of these — see above)
+- Microsoft account sign-in, skin and cape management, multi-account switching
+- Automatic Java detection and install, crash analysis, log export
+
+## Download
+
+Grab the latest build from [Releases](https://github.com/Havesten/PCL-CE/releases/latest). Single exe, no installer.
+
+Same requirements as upstream: Windows 10 1809 (17763) or newer, plus [.NET 10 Desktop Runtime](https://get.dot.net/10).
+
+## Building from source
+
+Requires .NET 10 SDK on Windows:
+
+```bash
+dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
+  -c Release -p:Platform=x64 -o ./artifact --no-self-contained
+```
+
+### Optional: build-time secrets
+
+A self-built copy ships with **no embedded keys**. Nothing breaks, but two features degrade:
+
+| Variable | Behaviour when missing |
+|---|---|
+| `PCL_CURSEFORGE_API_KEY` | CurseForge's official API returns 403 and falls back to the mcim mirror (download source must be set to Auto or Prefer mirror) |
+| `PCL_MS_CLIENT_ID` | Microsoft sign-in unavailable, offline login only |
+| `PCL_NAID_CLIENT_ID` / `_SECRET` | Natayark ID login unavailable (the Lobby is gone, so this is usually no longer needed) |
+
+```bash
+PCL_WRITE_SECRET=1 \
+PCL_CURSEFORGE_API_KEY='$2a$10$...' \
+PCL_MS_CLIENT_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' \
+  dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
+  -c Release -p:Platform=x64 -o ./artifact --no-self-contained
+```
+
+Note that `$` expands inside bash double quotes — wrap the key in single quotes.
+
+## Known issues
+
+- **The update endpoint still points at a dead address**, so the launcher skips update checks entirely
+- The first node-selection run takes 4–5 minutes depending on your network; results are cached for an hour
+- Without an embedded CurseForge key, search ordering and some fields differ slightly from the official API
+
+## Feedback
+
+**Do not report issues with this fork to PCL or PCL CE upstream.** They cannot reproduce changes made here, and it only adds work for them.
+
+Open an issue [in this repository](https://github.com/Havesten/PCL-CE/issues/new/choose) and attach the launcher log from `PCL/Log/`.
+
+## Credits and licensing
+
+This fork exists only because Meloong released PCL's source and because the PCL CE community keeps maintaining it. If it's useful to you, consider supporting the original author: [afdian.com/a/LTCat](https://afdian.com/a/LTCat).
+
+Licensing:
+
+- The `Plain Craft Launcher 2/` directory is covered by the *PCL Distribution Limited License* and the *PCL Repository Fair Use Guidelines*, see [`Plain Craft Launcher 2/LICENCE`](Plain%20Craft%20Launcher%202/LICENCE). This fork follows the "heavy use" terms:
+  - It declares itself a third-party derivative work, not an official build
+  - Its name starts with PCL and carries a suffix indicating third-party modification
+  - Author credit and the donation link remain first on the About page, and this repository is public
+  - The Minecraft purchase prompt (`McLaunchPrecheck`) and donation prompt are preserved
+  - No donation-unlock-like features are offered, and the primary hue stays blue
+- All other directories use the [Apache License 2.0](LICENSE)
+
+This fork is distributed free of charge, with no paid tier and no donation gate of any kind.
+
+## Star history
+
+<a href="https://www.star-history.com/?repos=Havesten%2FPCL-CE&type=date&legend=top-left">
+  <img src="https://api.star-history.com/chart?repos=Havesten/PCL-CE&type=date&legend=top-left" alt="Star History" width="600">
+</a>

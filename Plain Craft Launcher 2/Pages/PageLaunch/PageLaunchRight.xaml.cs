@@ -36,37 +36,7 @@ public partial class PageLaunchRight : IRefreshable
         PanBack.ScrollToHome();
         PanScroll = PanBack; // 不知道为啥不能在 XAML 设置
         PanLog.Visibility = Common.modeDebug ? Visibility.Visible : Visibility.Collapsed;
-        // 社区版提示
-        PanHint.Visibility = States.Hint.CEMessage
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        LabHint1.TrySetLocalizedValue("Text", "Launch.Right.CommunityHint.Message");
-        LabHint2.TrySetLocalizedValue("Text", "Launch.Right.CommunityHint.HidePrompt");
         _EnsureHomepageLiveWatcher();
-    }
-
-    // 暂时关闭快照版提示
-    private void BtnHintClose_Click(object sender, EventArgs e)
-    {
-        var input = (DialogService.Instance.Show(new InputDialogRequest
-        {
-            Title = Lang.Text("Launch.Right.CommunityHint.InputTitle"),
-            Buttons = DialogButtons.OkCancel,
-            HighLight = false,
-            ForceWait = true
-        }).Result?.InputText ?? "");
-        if (string.IsNullOrWhiteSpace(input))
-            return;
-        input = new string(input.Where(char.IsAsciiLetter).ToArray()).ToLower();
-        if (input.Contains("pclcommunity"))
-        {
-            Animations.AniDispose(PanHint, true);
-            States.Hint.CEMessage = false;
-        }
-        else
-        {
-            HintService.Show(Hints.Info(Lang.Text("Launch.Right.CommunityHint.WrongInput")));
-        }
     }
 
     #region 主页
@@ -246,7 +216,7 @@ public partial class PageLaunchRight : IRefreshable
                 
                 case 14:
                     LogWrapper.Info("[Page] 主页预设：PCL CE 公告栏");
-                    url = "https://s3.pysio.online/pcl2-ce/apiv2/pages/announce.xaml";
+                    url = "https://api.fuukir.cn/pclce-api/apiv2/pages/announce.xaml";
                     content = LoadFromNetwork(url);
                     break;
                 

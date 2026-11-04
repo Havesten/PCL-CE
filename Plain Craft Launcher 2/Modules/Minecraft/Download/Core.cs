@@ -456,6 +456,13 @@ public static partial class GameDownload
                     dlClientListBmclapiLoader,
                     5 + 30)
             ],
+            // 仅使用官方源：不给镜像源任何尝试机会
+            OfficialOnlySourceValue =>
+            [
+                new KeyValuePair<Loading.LoaderTask<string, DlClientListResult>, int>(
+                    dlClientListMojangLoader,
+                    60)
+            ],
             _ =>
             [
                 new KeyValuePair<Loading.LoaderTask<string, DlClientListResult>, int>(
@@ -510,6 +517,12 @@ public static partial class GameDownload
 
     private static void _MergeUnlistedVersions(JsonArray versions, string sourceDescription)
     {
+        if (Config.Download.VersionListSource == OfficialOnlySourceValue)
+        {
+            Common.Log("[Download] 已选择仅使用官方源，跳过未列出版本列表的镜像合并");
+            return;
+        }
+
         var cacheFilePath = $@"{Common.pathTemp}Cache\uvmc-download.json";
         if (!File.Exists(cacheFilePath))
             try

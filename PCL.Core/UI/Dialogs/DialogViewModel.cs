@@ -123,6 +123,10 @@ public sealed partial class DialogViewModel : ObservableObject
     public Action? ButtonAction(int button) =>
         button >= 1 && button <= Buttons.Length ? Buttons[button - 1].OnClick : null;
 
+    /// <summary>点击该按钮并执行动作后，是否需要保留弹窗。</summary>
+    public bool ButtonKeepOpen(int button) =>
+        button >= 1 && button <= Buttons.Length && Buttons[button - 1].KeepOpen;
+
     public IReadOnlyList<int> GetCheckedIndices()
         => Options.Where(option => option.IsChecked).Select(option => option.Index).ToList();
 

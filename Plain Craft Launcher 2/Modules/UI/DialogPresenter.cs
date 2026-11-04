@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System;
+using System.Linq;
+using System.Windows;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
 
@@ -81,8 +83,11 @@ public sealed class DialogPresenter : IDialogPresenter
         try
         {
             var text = string.IsNullOrEmpty(dialog.TextContent) ? dialog.Title : dialog.TextContent;
-            var buttons = dialog.Buttons.Length;
-            var flags = buttons switch
+            // 中间可能留空（例如「按钮1 + 空 + 关闭」），按实际存在的按钮建立索引映射
+            var indices = Enumerable.Range(1, DialogButtons.Capacity)
+                .Where(index => !string.IsNullOrEmpty(dialog.ButtonText(index)))
+                .ToArray();
+            var flags = indices.Length switch
             {
                 <= 1 => Microsoft.VisualBasic.MsgBoxStyle.OkOnly,
                 2 => Microsoft.VisualBasic.MsgBoxStyle.YesNo,
@@ -92,13 +97,14 @@ public sealed class DialogPresenter : IDialogPresenter
                 ? Microsoft.VisualBasic.MsgBoxStyle.Exclamation
                 : Microsoft.VisualBasic.MsgBoxStyle.Information;
             var result = Microsoft.VisualBasic.Interaction.MsgBox(text, flags | icon, dialog.Title);
-            var button = result switch
+            var position = result switch
             {
-                Microsoft.VisualBasic.MsgBoxResult.Yes => 1,
-                Microsoft.VisualBasic.MsgBoxResult.No => 2,
-                Microsoft.VisualBasic.MsgBoxResult.Cancel => buttons,
-                _ => 1
+                Microsoft.VisualBasic.MsgBoxResult.Yes => 0,
+                Microsoft.VisualBasic.MsgBoxResult.No => 1,
+                Microsoft.VisualBasic.MsgBoxResult.Cancel => Math.Max(0, indices.Length - 1),
+                _ => 0
             };
+            var button = indices.Length == 0 ? 1 : indices[Math.Min(position, indices.Length - 1)];
             dialog.Close(new DialogResult(button));
         }
         catch (Exception ex)

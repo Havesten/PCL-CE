@@ -144,7 +144,8 @@ public partial class NetworkService
         MaxAutomaticRedirections = 20,
         UseCookies = false,
         EnableMultipleHttp2Connections = true,
-        ConnectCallback = Config.Network.EnableDoH ? HostConnectionHandler.Instance.GetConnectionAsync : null
+        // 统一接管建连：命中 CDN 节点锁定时直接直连选定 IP，否则按 DoH／系统 DNS 解析后并发建连
+        ConnectCallback = HostConnectionHandler.Instance.GetConnectionAsync
     };
 
     /// <summary>

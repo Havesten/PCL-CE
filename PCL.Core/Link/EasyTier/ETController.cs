@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -48,7 +49,18 @@ public static class ETController
         return 0;
     }
 
-    public static int Launch(bool isHost, string? hostname = null)
+    /// <summary>
+    ///     启动 EasyTier。
+    /// </summary>
+    /// <param name="isHost">本机是否为房主。</param>
+    /// <param name="hostname">附加在主机名后的标识。</param>
+    /// <param name="peers">
+    ///     纯直连模式的对端地址（<c>-p</c>）。传了就**只用这些地址**，不碰预设节点；
+    ///     传 null 才走预设节点 + 自定义节点的老路径。
+    /// </param>
+    /// <param name="listenPort">本机监听端口，&lt;= 0 表示用 EasyTier 的默认值。</param>
+    public static int Launch(bool isHost, string? hostname = null, IReadOnlyList<string>? peers = null,
+        int listenPort = 0)
     {
         try
         {
@@ -113,33 +125,44 @@ public static class ETController
             }
 
             // 节点设置
-            var relays = ETRelay.RelayList;
-            var customNodes = Config.Link.CustomRelayServer;
-            foreach (var node in customNodes.Split([';'], StringSplitOptions.RemoveEmptyEntries))
+            if (peers is { Count: > 0 })
             {
-                if (node.Contains("tcp://") || node.Contains("udp://"))
-                {
-                    relays.Add(new ETRelay
-                    {
-                        Url = node,
-                        Name = "Custom",
-                        Type = ETRelayType.Custom
-                    });
-                }
-                else
-                {
-                    LogWrapper.Warn("Link", $"无效的自定义节点 URL: {node}");
-                }
+                // 纯直连：对方地址由调用方给定，不引入任何预设节点
+                foreach (var url in peers) arguments.Add("p", url);
+                LogWrapper.Info("Link", $"纯直连模式，对端: {string.Join(", ", peers)}");
             }
-
-            foreach (var relay in
-                     from relay in relays
-                     let serverType = Config.Link.ServerType
-                     where (relay.Type == ETRelayType.Selfhosted && serverType != 2) ||
-                           (relay.Type == ETRelayType.Community && serverType == 1) || relay.Type == ETRelayType.Custom
-                     select relay)
+            else
             {
-                arguments.Add("p", relay.Url);
+                // 复制一份再追加，避免把自定义节点写回静态列表（原来每连接一次就会重复累积）
+                var relays = new List<ETRelay>(ETRelay.RelayList);
+                var customNodes = Config.Link.CustomRelayServer;
+                foreach (var node in customNodes.Split([';'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (node.Contains("tcp://") || node.Contains("udp://"))
+                    {
+                        relays.Add(new ETRelay
+                        {
+                            Url = node,
+                            Name = "Custom",
+                            Type = ETRelayType.Custom
+                        });
+                    }
+                    else
+                    {
+                        LogWrapper.Warn("Link", $"无效的自定义节点 URL: {node}");
+                    }
+                }
+
+                foreach (var relay in
+                         from relay in relays
+                         let serverType = Config.Link.ServerType
+                         where (relay.Type == ETRelayType.Selfhosted && serverType != 2) ||
+                               (relay.Type == ETRelayType.Community && serverType == 1) ||
+                               relay.Type == ETRelayType.Custom
+                         select relay)
+                {
+                    arguments.Add("p", relay.Url);
+                }
             }
 
             // 中继行为设置
@@ -155,7 +178,33 @@ public static class ETController
             arguments.Add("encryption-algorithm", "chacha20");
             arguments.Add("default-protocol", Config.Link.ProtocolPreference.ToString().ToLower());
             arguments.AddFlagIf(!Config.Link.TryPunchSym, "disable-sym-hole-punching");
-            arguments.AddFlagIf(!Config.Link.EnableIPv6, "disable-ipv6");
+
+            // IP 协议栈。
+            // Auto 什么都不加：EasyTier 在 0.0.0.0 上监听时会自动同时监听 IPv6。
+            // Ipv4Only 用官方的 --disable-ipv6，IPv6 的监听与打洞一并关掉。
+            // Ipv6Only 没有对应的开关，只能不给 IPv4 监听器：-l 会覆盖默认监听列表，
+            // 于是只在 [::] 上监听。
+            switch (Config.Link.IpMode)
+            {
+                case LinkIpMode.Ipv4Only:
+                    arguments.AddFlag("disable-ipv6");
+                    break;
+                case LinkIpMode.Ipv6Only when listenPort <= 0:
+                    // 没指定端口时交给系统随机分配，避免和别的实例抢 11010
+                    arguments.Add("l", "tcp://[::]:0");
+                    arguments.Add("l", "udp://[::]:0");
+                    break;
+            }
+
+            // 纯直连需要双方事先约定端口：对方要连的就是这个端口，不能随机
+            if (listenPort > 0)
+            {
+                foreach (var url in PeerAddress.ListenUrls(listenPort, Config.Link.IpMode == LinkIpMode.Ipv6Only))
+                    arguments.Add("l", url);
+                LogWrapper.Info("Link", $"监听端口 {listenPort}");
+            }
+
+            LogWrapper.Info("Link", $"IP 协议栈: {Config.Link.IpMode}");
 
             // 用户名与其他参数
             arguments.AddFlagIf(Config.Link.UseLatencyFirstMode, "latency-first");

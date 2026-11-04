@@ -369,6 +369,10 @@ public static partial class Common
     /// </summary>
     public static bool CanFeedback(bool showHint)
     {
+        // 在线服务已禁用时不弹「更新检查失败」，直接静默不可用
+        if (!UpdateManager.OnlineServiceEnabled)
+            return false;
+
         var status = UpdateManager.GetVersionStatus();
 
         if (status == UpdateEnums.VersionStatus.Latest)

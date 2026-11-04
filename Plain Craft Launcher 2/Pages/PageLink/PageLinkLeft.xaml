@@ -1,0 +1,34 @@
+﻿<local:MyPageLeft x:Class="PCL.PageLinkLeft"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                  xmlns:local="clr-namespace:PCL"
+                  mc:Ignorable="d">
+    <StackPanel Orientation="Vertical" x:Name="PanItem" Margin="0,12,0,0">
+
+        <TextBlock Text="联机方式" Margin="13,5,5,3" Opacity="0.6" FontSize="12" />
+
+        <!-- P2P 直连页（Pages/PageLink/PageLinkP2P）暂时不对外暴露，需要恢复时把下面这一项加回来即可
+        <local:MyListItem x:Name="ItemP2P"
+                          IsScaleAnimationEnabled="False"
+                          Type="RadioBox" Tag="0"
+                          MinPaddingRight="35" Height="36"
+                          VerticalAlignment="Top"
+                          Title="P2P 直连"
+                          LogoScale="0.85"
+                          SvgIcon="lucide/link-2"
+                          Check="PageCheck" />
+        -->
+
+        <local:MyListItem x:Name="ItemRelay"
+                          IsScaleAnimationEnabled="False"
+                          Type="RadioBox" Tag="1"
+                          MinPaddingRight="35" Height="36"
+                          VerticalAlignment="Top"
+                          Title="中继联机"
+                          LogoScale="0.85"
+                          SvgIcon="lucide/server"
+                          Check="PageCheck" />
+    </StackPanel>
+</local:MyPageLeft>

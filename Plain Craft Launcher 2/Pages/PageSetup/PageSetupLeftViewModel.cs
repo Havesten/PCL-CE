@@ -18,8 +18,6 @@ public partial class PageSetupLeftViewModel : ViewModelBase
             PageID = FormMain.PageSubType.SetupJava;
         else if (!hideCfg.SetupGameManage)
             PageID = FormMain.PageSubType.SetupGameManage;
-        else if (!hideCfg.SetupGameLink)
-            PageID = FormMain.PageSubType.SetupGameLink;
         else if (!hideCfg.SetupUi)
             PageID = FormMain.PageSubType.SetupUI;
         else if (!hideCfg.SetupLauncherLanguage)
@@ -47,7 +45,6 @@ public partial class PageSetupLeftViewModel : ViewModelBase
             FormMain.PageSubType.SetupLaunch => "Setup.Left.Reset.Launch.Message",
             FormMain.PageSubType.SetupUI => "Setup.Left.Reset.Ui.Message",
             FormMain.PageSubType.SetupGameManage => "Setup.Left.Reset.GameManage.Message",
-            FormMain.PageSubType.SetupGameLink => "Setup.Left.Reset.GameLink.Message",
             FormMain.PageSubType.SetupLauncherLanguage => "Setup.Left.Reset.Language.Message",
             FormMain.PageSubType.SetupLauncherMisc => "Setup.Left.Reset.Misc.Message",
             _ => null

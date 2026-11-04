@@ -19,7 +19,9 @@ public static partial class Launcher
     public static PageSpeedLeft? frmSpeedLeft;
     public static PageSpeedRight? frmSpeedRight;
     public static PageToolsLeft? frmToolsLeft;
-    public static PageToolsGameLink? frmToolsGameLink;
+    public static PageLinkLeft? frmLinkLeft;
+    public static PageLinkP2P? frmLinkP2P;
+    public static PageLinkRelay? frmLinkRelay;
     public static PageToolsTest? frmToolsTest;
     public static PageDownloadLeft? frmDownloadLeft;
     public static PageDownloadInstall? frmDownloadInstall;
@@ -44,12 +46,12 @@ public static partial class Launcher
     public static PageSetupLaunch? frmSetupLaunch;
     public static PageSetupUI? frmSetupUi;
     public static PageSetupGameManage? frmSetupGameManage;
+    public static PageSetupDownloadSource? frmSetupDownloadSource;
     public static PageSetupUpdate? frmSetupUpdate;
     public static PageSetupJava? frmSetupJava;
     public static PageSetupAbout? frmSetupAbout;
     public static PageSetupLog? frmSetupLog;
     public static PageSetupFeedback? frmSetupFeedback;
-    public static PageSetupGameLink? frmSetupGameLink;
     public static PageSetupLauncherLanguage? frmSetupLauncherLanguage;
     public static PageSetupLauncherMisc? frmSetupLauncherMisc;
     public static PageLoginAuth? frmLoginAuth;

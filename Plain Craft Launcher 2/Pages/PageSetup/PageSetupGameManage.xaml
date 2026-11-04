@@ -35,6 +35,7 @@
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseMirror}" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.PreferOfficialThenMirror}" IsSelected="True" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficial}" />
+                            <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficialOnly}" />
                         </local:MyComboBox>
                         <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="{loc:Loc Setup.GameManage.Source.Version}" Margin="0,0,25,0"
                                    Grid.Row="2" />
@@ -45,6 +46,7 @@
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.Version.Mirror}" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.PreferOfficialThenMirror}" IsSelected="True" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficial}" />
+                            <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficialOnly}" />
                         </local:MyComboBox>
                         <TextBlock VerticalAlignment="Center" Grid.Row="4" HorizontalAlignment="Left" Text="{loc:Loc Setup.GameManage.Download.HttpProtocol}"
                                    Margin="0,0,25,0" />
@@ -123,6 +125,7 @@
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseMirror}" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Community.Source.PreferOfficialWithFallback}" IsSelected="True" />
                             <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficial}" />
+                            <local:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.UseOfficialOnly}" />
                         </local:MyComboBox>
                         <TextBlock Grid.Row="2" x:Name="TextFilenameFormat" VerticalAlignment="Center" HorizontalAlignment="Left" Text="{loc:Loc Setup.GameManage.Community.FilenameFormat}"
                                    Margin="0,0,25,0" />

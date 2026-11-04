@@ -169,7 +169,7 @@ public class EasyTierEntity
             .AddFlag("enable-kcp-proxy")
             .AddFlag("enable-quic-proxy")
             .AddFlagIf(!Config.Link.TryPunchSym, "disable-sys-hole-punching")
-            .AddFlagIf(!Config.Link.EnableIPv6, "disable-ipv6")
+            .AddFlagIf(Config.Link.IpMode == LinkIpMode.Ipv4Only, "disable-ipv6")
             .AddFlagIf(Config.Link.UseLatencyFirstMode, "latency-first")
             .Add("encryption-algorithm", "aes-gcm")
             .Add("compression", "zstd")

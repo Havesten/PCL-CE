@@ -47,14 +47,18 @@ public partial class PageSetupUpdate : IPageView
     private void Init()
     {
         Animations.AniBeginControl();
-        TextMirrorCDK.Password = Config.Update.MirrorChyanKey;
 
         ComboSystemUpdateChannel.SelectedIndex = (int)Config.Update.UpdateChannel;
         ComboSystemUpdateMode.SelectedIndex = (int)Config.Update.UpdateMode;
 
         _vm.Reload();
         Animations.AniEndControl();
-        CheckUpdate();
+
+        // 在线服务禁用时不自动请求更新源，用户仍可手动点击「检查更新」
+        if (UpdateManager.OnlineServiceEnabled)
+            CheckUpdate();
+        else
+            Common.Log("[Update] 在线服务已禁用，更新页跳过自动检查");
     }
 
     private async Task<UpdateStatus> IsLatestAsync()
@@ -321,16 +325,6 @@ public partial class PageSetupUpdate : IPageView
         {
             _vm.ChannelEnabled = true;
         }
-    }
-
-    private void TextMirrorCDK_PasswordChanged(object sender, EventArgs e)
-    {
-        Config.Update.MirrorChyanKey = TextMirrorCDK.Password;
-    }
-
-    private void BtnGetMirrorCDK_Click(object sender, MouseButtonEventArgs e)
-    {
-        Common.OpenWebsite("https://mirrorchyan.com/");
     }
 
     private void BtnChangelog_Click(object sender, MouseButtonEventArgs e)

@@ -993,7 +993,7 @@ public partial class PageDownloadCompFavorites : IPageView
         body.IsOpen = true;
     }
 
-    private void ComboTargetFav_Selected(object sender, RoutedEventArgs e)
+    private void ComboTargetFav_Selected(object sender, SelectionChangedEventArgs e)
     {
         if (ComboTargetFav.SelectedItem is null)
             return;

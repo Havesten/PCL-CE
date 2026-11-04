@@ -35,7 +35,7 @@ public partial class PageToolsLeft : IPageView
 
     private void RefreshNavigation()
     {
-        var isHiddenPage = _vm.IsHiddenPage(ItemGameLink.Checked, ItemTest.Checked, PageSetupUI.HiddenForceShow);
+        var isHiddenPage = _vm.IsHiddenPage(ItemTest.Checked, PageSetupUI.HiddenForceShow);
 
         // 若页面错误，或尚未加载，则继续
         if (isLoad && !isHiddenPage)
@@ -46,15 +46,7 @@ public partial class PageToolsLeft : IPageView
         // 选择第一个未被禁用的子页面
         if (isPageSwitched)
             return;
-        switch (_vm.ResolveInitialPageId())
-        {
-            case FormMain.PageSubType.ToolsTest:
-                ItemTest.SetChecked(true, false, false);
-                break;
-            default:
-                ItemGameLink.SetChecked(true, false, false);
-                break;
-        }
+        ItemTest.SetChecked(true, false, false);
     }
 
     private void PageOtherLeft_Unloaded(object sender, RoutedEventArgs e)
@@ -62,23 +54,9 @@ public partial class PageToolsLeft : IPageView
         isPageSwitched = false;
     }
 
+    /// <summary>工具页目前只剩百宝箱，没有需要单独刷新的子页面。</summary>
     public void Refresh(object sender, EventArgs e)
     {
-        var button = (MyIconButton)sender;
-        if (button.Tag is null)
-            return;
-        double id = Common.Val(button.Tag);
-        switch (id)
-        {
-            case (double)FormMain.PageSubType.ToolsGameLink:
-            {
-                if (Launcher.frmToolsGameLink is null)
-                    Launcher.frmToolsGameLink = new PageToolsGameLink();
-                Launcher.frmToolsGameLink.Reload();
-                ItemGameLink.Checked = true;
-                break;
-            }
-        }
     }
 
     #region 页面切换
@@ -86,7 +64,7 @@ public partial class PageToolsLeft : IPageView
     /// <summary>
     ///     当前页面的编号。
     /// </summary>
-    public FormMain.PageSubType pageID = FormMain.PageSubType.ToolsGameLink;
+    public FormMain.PageSubType pageID = FormMain.PageSubType.ToolsTest;
 
     /// <summary>
     ///     勾选事件改变页面。
@@ -105,12 +83,6 @@ public partial class PageToolsLeft : IPageView
         var targetID = id ?? pageID;
         switch (id)
         {
-            case FormMain.PageSubType.ToolsGameLink:
-            {
-                if (Launcher.frmToolsGameLink is null)
-                    Launcher.frmToolsGameLink = new PageToolsGameLink();
-                return Launcher.frmToolsGameLink;
-            }
             case FormMain.PageSubType.ToolsTest:
             {
                 if (Launcher.frmToolsTest is null)

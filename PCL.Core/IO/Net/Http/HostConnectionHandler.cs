@@ -8,6 +8,8 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App;
+using PCL.Core.IO.Net.Cdn;
 using PCL.Core.IO.Net.Dns;
 using PCL.Core.Logging;
 using PCL.Core.Utils.Exts;
@@ -22,6 +24,14 @@ public class HostConnectionHandler
     private readonly DnsQuery _dnsQuery = DnsQuery.Instance;
     private static readonly TimeSpan _CacheDuration = TimeSpan.FromMinutes(10); // 10 分钟缓存(RFC 建议值)
     private const int WaitTasks = 2;
+
+    /// <summary>尝试连接锁定节点的限时，超时后回退到常规解析。</summary>
+    private const int PinnedConnectTimeoutMs = 6000;
+
+    /// <summary>锁定节点连接失败后的冷却时长，避免每次新建连接都重复等待。</summary>
+    private static readonly TimeSpan PinCooldownDuration = TimeSpan.FromMinutes(5);
+
+    private static readonly ConcurrentDictionary<(string host, string ip), DateTime> PinCooldowns = new();
 
     // 缓存结构: (host, port) -> (IPAddress -> LastSuccessUtc)
     private readonly ConcurrentDictionary<(string host, int port), ConcurrentDictionary<IPAddress, DateTime>>
@@ -39,7 +49,20 @@ public class HostConnectionHandler
             return await _ConnectToAddressAsync(directIp, port, cancellationToken).ConfigureAwait(false);
         }
 
-        var addresses = await _dnsQuery.QueryForIpAsync(host, cancellationToken).ConfigureAwait(false);
+        // 已锁定的 CDN 节点优先直连，跳过 DNS 解析。
+        // SNI 与 Host 头仍由 HttpClient 依据请求 URI 填写，证书校验不受影响。
+        if (CdnNodePin.IsActive && CdnNodePin.TryGetPins(host, out var pinnedAddresses))
+        {
+            var candidates = pinnedAddresses.Where(address => !_IsPinCoolingDown(host, address)).ToArray();
+            if (candidates.Length > 0)
+            {
+                var pinnedStream = await _ConnectPinnedAsync(host, port, candidates, cancellationToken)
+                    .ConfigureAwait(false);
+                if (pinnedStream is not null) return pinnedStream;
+            }
+        }
+
+        var addresses = await _ResolveAsync(host, cancellationToken).ConfigureAwait(false);
         if (addresses is null || addresses.Length == 0)
         {
             throw new HttpRequestException($"DNS resolution failed for {host}");
@@ -99,6 +122,104 @@ public class HostConnectionHandler
         finally
         {
             cancellationSource.Dispose();
+        }
+    }
+
+    private async Task<IPAddress[]?> _ResolveAsync(string host, CancellationToken cancellationToken)
+    {
+        if (_IsDoHEnabled())
+            return await _dnsQuery.QueryForIpAsync(host, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var addresses = await System.Net.Dns.GetHostAddressesAsync(host, cancellationToken)
+                .ConfigureAwait(false);
+            return addresses.Distinct().ToArray();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogWrapper.Warn(ex, ModuleName, $"系统 DNS 解析 {host} 失败");
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     尝试连接锁定节点。同时锁定 IPv4 与 IPv6 时并发建连（v6 先发、v4 稍后），取先成功者。
+    /// </summary>
+    /// <returns>连接成功返回流；全部失败返回 <c>null</c>，调用方应回退到常规解析。</returns>
+    private async Task<Stream?> _ConnectPinnedAsync(
+        string host,
+        int port,
+        IPAddress[] candidates,
+        CancellationToken cancellationToken)
+    {
+        // 锁定节点可能已经失效或不可达，必须限时，否则会一直挂到 HttpClient 整体超时
+        using var pinTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        pinTimeout.CancelAfter(PinnedConnectTimeoutMs);
+
+        try
+        {
+            if (candidates.Length == 1)
+            {
+                var stream = await _ConnectToAddressAsync(candidates[0], port, pinTimeout.Token)
+                    .ConfigureAwait(false);
+                PinCooldowns.TryRemove((host, candidates[0].ToString()), out _);
+                LogWrapper.Debug(ModuleName, $"已锁定 {host} 到节点 {candidates[0]}");
+                return stream;
+            }
+
+            var tasks = new List<Task<NetworkStream>>(candidates.Length);
+            foreach (var address in candidates)
+            {
+                // 与常规建连保持一致：IPv6 立即发起，IPv4 稍后补上
+                var delayMs = address.AddressFamily == AddressFamily.InterNetwork ? 80 : 0;
+                tasks.Add(_DelayedConnectAsync(address, port, delayMs, pinTimeout.Token));
+            }
+
+            var winnerTask = await tasks.WhenAnySuccessAsync().ConfigureAwait(false);
+            var winner = await winnerTask.ConfigureAwait(false);
+            var remoteIp = ((IPEndPoint)winner.Socket.RemoteEndPoint!).Address;
+            PinCooldowns.TryRemove((host, remoteIp.ToString()), out _);
+            LogWrapper.Debug(ModuleName,
+                $"已锁定 {host} 到节点 {remoteIp}（双栈并发，共 {tasks.Count} 条路径）");
+
+            // 取消其余路径并释放已经建立的连接
+            // ReSharper disable once MethodHasAsyncOverload
+            pinTimeout.Cancel();
+            _ = _CleanupUnusedConnectionsAsync(tasks, winnerTask).ConfigureAwait(false);
+            return winner;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // 两条路径都失败（或整体超时）时一起冷却，避免每次请求重复等待
+            foreach (var address in candidates)
+                PinCooldowns[(host, address.ToString())] = DateTime.UtcNow + PinCooldownDuration;
+            LogWrapper.Warn(ex, ModuleName,
+                $"锁定节点 {string.Join(", ", candidates.Select(address => address.ToString()))} 连接 {host} 失败，回退到常规解析");
+            return null;
+        }
+    }
+
+    private static bool _IsPinCoolingDown(string host, IPAddress address)    {
+        var key = (host, address.ToString());
+        if (!PinCooldowns.TryGetValue(key, out var until))
+            return false;
+        if (until > DateTime.UtcNow)
+            return true;
+        PinCooldowns.TryRemove(key, out _);
+        return false;
+    }
+
+    private static bool _IsDoHEnabled()
+    {
+        try
+        {
+            return Config.Network.EnableDoH;
+        }
+        catch
+        {
+            // 配置服务尚未就绪时按默认值处理
+            return true;
         }
     }
 

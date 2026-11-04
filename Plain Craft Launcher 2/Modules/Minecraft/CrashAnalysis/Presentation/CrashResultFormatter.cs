@@ -512,9 +512,10 @@ internal sealed class CrashResultFormatter
     {
         try
         {
-            return UpdateManager.GetVersionStatus() == UpdateEnums.VersionStatus.Latest
-                ? null
-                : Lang.Text("Crash.Suggestion.LauncherOutdated");
+            // 仅在确认「确实有更新」时才建议升级；未知状态（例如在线服务已禁用）不应误导用户
+            return UpdateManager.GetVersionStatus() == UpdateEnums.VersionStatus.NotLatest
+                ? Lang.Text("Crash.Suggestion.LauncherOutdated")
+                : null;
         }
         catch (Exception ex)
         {

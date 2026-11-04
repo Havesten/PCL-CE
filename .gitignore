@@ -346,3 +346,18 @@ MaskFiles/
 # macOS
 
 **/.DS_Store
+
+# ---- PCL CE FIX 云端/中继服务端（私有，不公开到 GitHub）----
+cloud/
+relay/
+scripts/
+
+# Go 交叉编译产物
+dist/
+
+# 启动器发布产物与运行时数据
+artifact/
+
+# 工作区/杂项
+.workbuddy/
+@AutomationLog.txt

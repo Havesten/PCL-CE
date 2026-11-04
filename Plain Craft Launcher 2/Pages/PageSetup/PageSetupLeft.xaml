@@ -62,25 +62,13 @@
                 </local:MyListItem.Buttons>
             </local:MyListItem>
 
-            <TextBlock Text="{loc:Loc Setup.Left.Category.Tools}" Margin="13,5,5,3" Opacity="0.6"
-                       FontSize="12" x:Name="TextToolsCategory" />
+            <local:MyListItem x:Name="ItemDownloadSource" IsScaleAnimationEnabled="False" Tag="12"
+                              MinPaddingRight="35" Height="36" VerticalAlignment="Top"
+                              Title="{loc:Loc Setup.Left.Item.DownloadSource}" Type="RadioBox"
+                              Check="PageCheck"
+                              LogoScale="0.95" SvgIcon="lucide/gauge" />
 
-            <local:MyListItem x:Name="ItemGameLink" IsScaleAnimationEnabled="False" Type="RadioBox" Tag="7"
-                               Check="PageCheck"
-                               MinPaddingRight="35" Height="36" VerticalAlignment="Top"
-                               Title="{loc:Loc Setup.Left.Item.GameLink}"
-                              SvgIcon="lucide/bubbles">
-                <local:MyListItem.Buttons>
-                    <x:Array Type="{x:Type local:MyIconButton}">
-                        <local:MyIconButton Tag="7" ToolTip="{loc:Loc Common.Action.Initialize}"
-                                            ToolTipService.Placement="Right"
-                                            ToolTipService.InitialShowDelay="200" ToolTipService.VerticalOffset="-1"
-                                            Click="Reset"
-                                            SvgIcon="lucide/rotate-ccw"
-                                            LogoScale="0.9" />
-                    </x:Array>
-                </local:MyListItem.Buttons>
-            </local:MyListItem>
+            <!-- 「工具」分类与其中的「联机」设置项已移除：EasyTier 直连隐藏后，这里的设置无处生效 -->
 
             <TextBlock Text="{loc:Loc Setup.Left.Category.Launcher}" Margin="13,5,5,3"
                        Opacity="0.6" FontSize="12" x:Name="TextLauncherCategory" />

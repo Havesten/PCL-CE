@@ -1,0 +1,141 @@
+﻿<local:MyPageRight x:Class="PCL.PageLinkP2P"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          x:Name="PanBack">
+        <StackPanel Margin="25,10">
+
+            <local:MyCard Margin="0,15,0,10" Title="联机方式">
+                <StackPanel Margin="25,40,25,18">
+                    <StackPanel Orientation="Horizontal">
+                        <local:MyRadioBox x:Name="RadioHost" Text="我是房主" Checked="True"
+                                          Check="RadioMode_Check" />
+                        <local:MyRadioBox x:Name="RadioJoin" Text="我是玩家" Margin="28,0,0,0"
+                                          Check="RadioMode_Check" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabModeHint" Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.7"
+                               Text="游戏开在你的这台电脑上。创建房间后把房间码发给朋友，他们就能连进来。" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,10" Title="房间码">
+                <StackPanel Margin="25,40,25,18">
+
+                    <!-- 房主：展示自动生成的码 -->
+                    <StackPanel x:Name="PanHostCode">
+                        <DockPanel>
+                            <local:MyButton DockPanel.Dock="Right" Text="换一个" ColorType="Normal" Width="80"
+                                            Click="BtnRegen_Click" />
+                            <local:MyButton x:Name="BtnCopyCode" DockPanel.Dock="Right" Text="复制" ColorType="Normal"
+                                            Width="72" Margin="8,0,0,0" Click="BtnCopyCode_Click" />
+                            <TextBlock x:Name="LabCode" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+                        <TextBlock Margin="0,10,0,0" Opacity="0.6" FontSize="12" TextWrapping="Wrap"
+                                   Text="这串码里已经包含网络名称、密钥和端口，把这行原样发给朋友即可。每次点「换一个」都会生成一组新的。" />
+                    </StackPanel>
+
+                    <!-- 玩家：粘贴房主给的码 -->
+                    <StackPanel x:Name="PanJoinCode" Visibility="Collapsed">
+                        <local:MyTextBox x:Name="TextJoinCode" Height="30" MaxLines="1" AcceptsReturn="False"
+                                         HintText="粘贴房主发来的房间码，例如 ABCD-EFGH-JKLM-NPQR"
+                                         TextChanged="TextJoinCode_TextChanged" />
+                        <TextBlock x:Name="LabParseHint" Margin="0,10,0,0" TextWrapping="Wrap" Opacity="0.7"
+                                   Text="还没有粘贴房间码。" />
+                    </StackPanel>
+
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,10" Title="网络协议">
+                <StackPanel Margin="25,40,25,18">
+                    <StackPanel Orientation="Horizontal">
+                        <local:MyRadioBox x:Name="RadioIpAuto" Text="自动" Checked="True" Check="RadioIp_Check" />
+                        <local:MyRadioBox x:Name="RadioIpV4" Text="仅 IPv4" Margin="28,0,0,0" Check="RadioIp_Check" />
+                        <local:MyRadioBox x:Name="RadioIpV6" Text="仅 IPv6" Margin="28,0,0,0" Check="RadioIp_Check" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabIpHint" Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.7" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,10" Title="连接">
+                <StackPanel Margin="25,40,25,18">
+
+                    <DockPanel x:Name="PanPort" Height="30" Margin="0,0,0,12">
+                        <TextBlock DockPanel.Dock="Left" Text="游戏端口" Width="72" Opacity="0.75"
+                                   VerticalAlignment="Center" />
+                        <local:MyTextBox x:Name="TextGamePort" Height="28" MaxLines="1" AcceptsReturn="False"
+                                         Text="25565" TextChanged="TextGamePort_TextChanged" />
+                    </DockPanel>
+
+                    <DockPanel Height="30" Margin="0,0,0,12">
+                        <TextBlock DockPanel.Dock="Left" Text="对端地址" Width="72" Opacity="0.75"
+                                   VerticalAlignment="Center" />
+                        <local:MyTextBox x:Name="TextPeer" Height="28" MaxLines="1" AcceptsReturn="False"
+                                         HintText="对方的 IP:端口，例如 1.2.3.4:11010"
+                                         TextChanged="TextPeer_TextChanged" />
+                    </DockPanel>
+
+                    <DockPanel x:Name="PanListenPort" Height="30" Margin="0,0,0,12">
+                        <TextBlock DockPanel.Dock="Left" Text="监听端口" Width="72" Opacity="0.75"
+                                   VerticalAlignment="Center" />
+                        <local:MyTextBox x:Name="TextListenPort" Height="28" MaxLines="1" AcceptsReturn="False"
+                                         Text="11010" />
+                    </DockPanel>
+
+                    <TextBlock x:Name="LabPeerHint" Margin="0,0,0,12" TextWrapping="Wrap" Opacity="0.6"
+                               FontSize="12" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <local:MyButton x:Name="BtnStart" Text="创建房间" ColorType="Highlight" Width="120"
+                                        Click="BtnStart_Click" />
+                        <local:MyButton x:Name="BtnStop" Text="断开" ColorType="Red" Width="90" Margin="10,0,0,0"
+                                        Visibility="Collapsed" Click="BtnStop_Click" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="LabStatus" Margin="0,14,0,0" TextWrapping="Wrap" Opacity="0.8"
+                               Text="未连接" />
+
+                    <Border x:Name="PanAddress" Margin="0,12,0,0" Padding="14,12" CornerRadius="6"
+                            Background="{DynamicResource ColorBrush7}" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock x:Name="LabAddressHint" Opacity="0.7" TextWrapping="Wrap"
+                                       Text="把这个地址发给朋友，在游戏里用「直接连接」加入" />
+                            <DockPanel Margin="0,8,0,0">
+                                <local:MyButton DockPanel.Dock="Right" Text="复制" ColorType="Normal" Width="72"
+                                                Click="BtnCopyAddress_Click" />
+                                <TextBlock x:Name="LabAddress" FontFamily="Consolas" FontSize="16"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid x:Name="PanRuntime" Margin="0,16,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="房间内节点" Opacity="0.6" FontSize="12" />
+                            <TextBlock x:Name="LabPeerCount" Text="—" Margin="0,5,0,0" FontSize="14" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="连接方式" Opacity="0.6" FontSize="12" />
+                            <TextBlock x:Name="LabPeerRoute" Text="—" Margin="0,5,0,0" FontSize="14" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="延迟" Opacity="0.6" FontSize="12" />
+                            <TextBlock x:Name="LabPeerPing" Text="—" Margin="0,5,0,0" FontSize="14" />
+                        </StackPanel>
+                    </Grid>
+
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

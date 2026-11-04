@@ -130,49 +130,51 @@ public partial class MyMsgText
         }, "MyMsgBox " + uuid);
     }
 
-    public void Btn1_Click(object? sender = null, MouseButtonEventArgs? e = null)
+    public void Btn1_Click(object? sender = null, MouseButtonEventArgs? e = null) => ExecuteButton(1);
+
+    public void Btn2_Click(object sender, MouseButtonEventArgs e) => ExecuteButton(2);
+
+    public void Btn3_Click(object sender, MouseButtonEventArgs e) => ExecuteButton(3);
+
+    /// <summary>
+    ///     统一的按钮处理：执行动作后关闭弹窗，除非该按钮显式要求保留（例如 EULA 的「查看」）。
+    ///     <para>
+    ///         此前带动作的按钮执行完直接 return，弹窗既不会关闭、也不会走「关闭」分支；
+    ///         公告弹窗正是「按钮1 + 空 + 关闭」的组合，一旦点掉唯一可见的按钮就再也关不掉了。
+    ///     </para>
+    /// </summary>
+    private void ExecuteButton(int button)
     {
-        if (myDialog.IsClosed)
-            return;
-        var action = myDialog.ButtonAction(1);
-        if (action is not null)
+        if (myDialog.IsClosed) return;
+
+        var action = myDialog.ButtonAction(button);
+        if (action is null)
         {
-            action();
+            myDialog.CloseByButton(button);
+            Close();
             return;
         }
 
-        myDialog.CloseByButton(1);
-        Close();
-    }
-
-    public void Btn2_Click(object sender, MouseButtonEventArgs e)
-    {
-        if (myDialog.IsClosed)
-            return;
-        var action = myDialog.ButtonAction(2);
-        if (action is not null)
+        try
         {
             action();
-            return;
         }
-
-        myDialog.CloseByButton(2);
-        Close();
-    }
-
-    public void Btn3_Click(object sender, MouseButtonEventArgs e)
-    {
-        if (myDialog.IsClosed)
-            return;
-        var action = myDialog.ButtonAction(3);
-        if (action is not null)
+        catch (Exception ex)
         {
-            action();
-            return;
+            Common.Log(
+                ex,
+                "弹窗按钮动作执行失败",
+                Common.LogLevel.Hint,
+                userSummary: Lang.Text("Application.Control.MessageBox.Error.OperationFailed"));
         }
-
-        myDialog.CloseByButton(3);
-        Close();
+        finally
+        {
+            if (!myDialog.ButtonKeepOpen(button) && !myDialog.IsClosed)
+            {
+                myDialog.CloseByButton(button);
+                Close();
+            }
+        }
     }
 
     private void Drag(object sender, MouseButtonEventArgs e)

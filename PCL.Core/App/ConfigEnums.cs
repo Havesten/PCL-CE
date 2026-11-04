@@ -10,6 +10,27 @@ public enum LinkProtocolPreference
 }
 
 /// <summary>
+/// 联机使用的 IP 协议栈。
+/// </summary>
+public enum LinkIpMode
+{
+    /// <summary>
+    /// 同时使用 IPv4 与 IPv6，由 EasyTier 自行选择路径。默认值。
+    /// </summary>
+    Auto = 0,
+
+    /// <summary>
+    /// 只用 IPv4，关闭 IPv6 监听与打洞。IPv6 环境有问题时用这个。
+    /// </summary>
+    Ipv4Only = 1,
+
+    /// <summary>
+    /// 只用 IPv6，不监听 IPv4。要求双方都有可路由的 IPv6 地址。
+    /// </summary>
+    Ipv6Only = 2
+}
+
+/// <summary>
 /// 文件下载使用的 HTTP 协议模式。
 /// </summary>
 public enum DownloadHttpMode

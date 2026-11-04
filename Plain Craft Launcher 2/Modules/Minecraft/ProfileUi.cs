@@ -251,13 +251,16 @@ public static class ProfileUi
         });
         var selected = selectedDialog.IsConfirmed ? selectedDialog.SelectedIndex : null;
         if (selected is null) return;
-        ProfileService.IsCreatingProfile = true;
-        var type = selected.Value switch
+        // 离线登录已移除，选项只剩「微软」与「第三方」，越界索引直接放弃创建。
+        GameLaunch.McLoginType? picked = selected.Value switch
         {
             0 => GameLaunch.McLoginType.Ms,
             1 => GameLaunch.McLoginType.Auth,
-            _ => GameLaunch.McLoginType.Legacy
+            _ => null
         };
+        if (picked is null) return;
+        var type = picked.Value;
+        ProfileService.IsCreatingProfile = true;
         if (type == GameLaunch.McLoginType.Auth)
         {
             var serverDialog = await DialogService.Instance.ShowAsync(new AuthServerDialogRequest
@@ -282,11 +285,14 @@ public static class ProfileUi
         Common.RunInUi(() => Launcher.frmLaunchLeft.RefreshPage(true, type));
     }
 
+    /// <summary>
+    ///     可创建的验证方式。离线登录已禁用：本发行版要求所有档案都经过账号验证，
+    ///     不再提供绕过验证的入口（已有的离线档案仍可正常启动，不做破坏性处理）。
+    /// </summary>
     private static List<IMyRadio> _GetAvailableProfileSelection(bool includeOthers) => includeOthers
         ? [
             new MyListItem { Title = Lang.Text("Launch.Account.Type.Microsoft"), Type = MyListItem.CheckType.RadioBox, SvgIcon = "lucide/shield-check" },
-            new MyListItem { Title = Lang.Text("Launch.Account.Type.ThirdParty"), Type = MyListItem.CheckType.RadioBox, SvgIcon = "lucide/network" },
-            new MyListItem { Title = Lang.Text("Launch.Account.Type.Offline"), Type = MyListItem.CheckType.RadioBox, SvgIcon = "lucide/link-2-off" }
+            new MyListItem { Title = Lang.Text("Launch.Account.Type.ThirdParty"), Type = MyListItem.CheckType.RadioBox, SvgIcon = "lucide/network" }
         ]
         : [new MyListItem { Title = Lang.Text("Launch.Account.Type.Microsoft"), Type = MyListItem.CheckType.RadioBox, SvgIcon = "lucide/shield-check" }];
 

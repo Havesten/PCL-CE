@@ -1,73 +1,152 @@
-**简体中文** | [English](README-EN.md) | [繁體中文](README-ZH_TW.md)
+|          |                         |                         |
+| -------- | ----------------------- | ----------------------- |
+| **简体中文** | [English](README-EN.md) | [繁體中文](README-ZH_TW.md) |
 
 <div align="center">
 
-<img src="Plain Craft Launcher 2/Images/icon.ico" alt="Logo" width="80" height="80">
+![Logo](<Plain Craft Launcher 2/Images/icon.ico>)
 
-# PCL Community Edition
+# PCL CE FIX
 
-[![Stars](https://img.shields.io/github/stars/PCL-Community/PCL-CE?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=stars&labelColor=444444&color=eac54f)](https://github.com/PCL-Community/PCL-CE/)
-![GitHub Release](https://img.shields.io/github/v/release/PCL-Community/PCL-CE?label=release&logo=github&style=for-the-badge)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/PCL-Community/PCL-CE/build-test.yml?style=for-the-badge)
+基于 PCL 社区版二次开发的第三方分支
 
-[![Issues](https://img.shields.io/github/issues/PCL-Community/PCL-CE?style=for-the-badge&label=issues&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Community/PCL-CE/issues)
-[![Pull requests](https://img.shields.io/github/issues-pr/PCL-Community/PCL-CE?style=for-the-badge&label=pull%20requests&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Community/PCL-CE/pulls)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/PCL-Community/PCL-CE/total?style=for-the-badge)
-[![哔哩哔哩](https://img.shields.io/badge/动态-bilibili-00A4DB?style=for-the-badge&labelColor=444444&logo=bilibili)](https://space.bilibili.com/3546847192811755/dynamic) <br />
+[本分支发布页](https://github.com/Havesten/PCL-CE/releases) |  
+[社区版上游](https://github.com/PCL-Community/PCL-CE) |  
+[PCL 原作者](https://github.com/Meloong-Git/PCL)
 
-<a href="https://trendshift.io/repositories/21800?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-21800" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/21800/weekly?language=C%23" alt="PCL-Community%2FPCL-CE | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/21800" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/21800" alt="PCL-Community%2FPCL-CE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-[社区版下载](https://github.com/PCL-Community/PCL-CE/releases/latest) |
-[上游存储库](https://github.com/Meloong-Git/PCL)
-
-[提交问题](https://github.com/PCL-Community/PCL-CE/issues/new/choose) |
-[贡献指南](https://github.com/PCL-Community/PCL-CE/wiki/开发指南)
+[提交问题](https://github.com/Havesten/PCL-CE/issues/new/choose) |  
+[更新日志](https://github.com/Havesten/PCL-CE/releases)
 
 </div>
 
-PCL CE 是基于 PCL 开源代码二次开发的社区版本，包括了主线暂未制作的功能和改进！
+## 这是什么
 
-社区版的版本号与主线并非严格对应关系，也请不要向官方仓库反馈社区版问题。
+PCL（Plain Craft Launcher）是龙腾猫跃开发的 Minecraft 启动器。PCL CE 是社区在其开源代码基础上继续开发的版本。
 
-欢迎大家来用用看！
+本仓库是 **PCL CE 的第三方分支**，由个人独立维护。它不是 PCL 或 PCL CE 的官方版本，也不代表上游的任何立场。
 
-**开发群:** [599620549](https://qm.qq.com/q/PNQA4Md8wc)[✦](https://t.me/+78XW2bUOvKJjMTZl) | **用户 1 群:** [1028074835](https://qm.qq.com/q/qrMGJo8BQQ) | **用户 2 群:** [1070029541](https://qm.qq.com/q/lBywbDMWhG)
+## 与原版 PCL CE 的差异
 
-## 💻 支持平台
+### 新增：下载节点优选
 
-| 操作系统 | 支持情况 | 环境要求 |
-|---|---|---|
-| Windows 10 1809 (17763) 或更高 | ✅ 完整支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
-| Windows 8 - Windows 10 1809 (17763) | ⚠️ 理论能跑，酌情提供社区支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
-| Windows 7 或更低版本 | ❌ 不支持 | / |
-| macOS / Linux / 其他操作系统 | ⚠️ 仅跨平台开发支持（交叉编译） | [.NET 10 SDK](https://get.dot.net/10) |
+原本只能在「官方源」和「镜像源」之间二选一，没法控制具体连哪台节点。现在会先对每台候选节点做 TCP 与 TLS 握手计时，多轮取中位数抑制抖动，锁定延迟最低的一个，后续请求直接连它 —— URL、SNI、证书校验全部保持不变。
 
-**✅ 完整支持**：尽可能提供一切相关支持，但必须确保启动器为最新版本。
+覆盖 16 个域名，分四组：
 
-**⚠️ 理论能跑，酌情提供社区支持**：PCL CE 应该可以在这些平台上运行，但不保证功能完全可用。你可能需要升级到完整支持的系统版本以获得进一步社区技术支持。
+| 分组         | 域名                                                |
+| ---------- | ------------------------------------------------- |
+| Mojang 本体  | piston-meta、launchermeta、launcher、resources 等 6 个 |
+| 模组加载器      | Forge、NeoForge、Fabric 的 maven 与列表站，共 5 个          |
+| CurseForge | api、edge、mediafilez                               |
+| Modrinth   | api、cdn                                           |
 
-**❌ 不支持**：PCL CE 在这些平台的可用性较低，甚至压根打不开。请升级操作系统以使用 PCL CE。
+Cloudflare 站点会额外改用通用优选 IP 池（`cloudflare.182682.xyz` 的解析结果），整个池只测速一次，所有 CF 域名共用结果 —— 因为 CF 是 Anycast，一组优选 IP 对所有接入 CF 的域名通用。非 CF 站点（AWS CloudFront、Fastly、Azure）判定后照常走自己的解析结果，不会误用。
 
-**⚠️ 仅跨平台开发支持（交叉编译）**：PCL CE 的源代码可以在 macOS 与 Linux 平台编译，但无法直接运行。作为开发者，你可以在这些平台上进行开发，然后将编译产物转移到 Windows 系统测试。
+入口在「设置 → 下载 → 节点优选」，可随时重测或固定节点。
 
-**注**：    
-社区仅对最新版本的启动器提供支持。    
-取决于部分问题的特殊性（如系统不完整），有时你仍然必须升级操作系统以继续获得支持。    
-PCL CE 始终建议使用最新版本的操作系统以获得最佳体验。    
-你仍然可以尝试在不受支持的系统上使用 PCL CE，但可能会遇到很多额外问题。
+### 调整：更新源
 
-## 🔒 许可证
+- 移除 Mirror 酱内测通道及对应的 CDK 输入框
+- 更新地址改为私有服务端，协议与 Minio 源兼容
+- 关闭在线更新时不再弹社区版公告
 
-- `Plain Craft Launcher 2/` 使用 [自定义许可证](https://github.com/PCL-Community/PCL-CE/blob/dev/Plain%20Craft%20Launcher%202/LICENCE)
-- `其余所有目录` 使用 [Apache License 2.0](https://github.com/PCL-Community/PCL-CE/blob/dev/LICENSE)
+### 删除重构：联机部分
 
-## 🌟 统计数据
-![Alt](https://repobeats.axiom.co/api/embed/3e46296e6e3a134991a783480fd2f62723bb0353.svg "Repobeats analytics image")
+原「大厅」入口及其依赖的 Natayark 账号登录已移除，联机整体删除后重建：从「工具」页提到标题栏，成为与启动、下载、设置、工具并列的入口，目前对外提供中继联机。
 
-[![Star History Chart](https://api.star-history.com/chart?repos=PCL-Community/PCL-CE&type=date&legend=top-left&sealed_token=Ts-GaAXJ5nb9fJERusrXneo05pfZ83tMhReHJ98nmmlemBTqHS5Ozocdep1MTMdsX-6CRiQH9TqiS1Kk7SxjTfk02eUOxnm25oHff6TLLvrY7pGujOkU1IwjVFQLE-5GJYogutJAyI78jujBlOnpk3J2OKAY1PBhmkyUOzW1C1sdz5BzPbj2eBbJGvDx)](https://www.star-history.com/?repos=PCL-Community%2FPCL-CE&type=date&legend=top-left)
+- **中继联机**：房主本地端口由中继服务器映射到公网，不需要公网 IP，双方都在 NAT 后面也能连。需要邮箱验证码登录（首次登录即注册，带人机验证），登录后可看月流量、限速与端口名额；这些限制由服务端下发并在服务端执行，改本地配置无法绕过。隧道协议为自研 PTP v1，客户端与服务端全部内置，不需要任何外部二进制
+- **P2P 直连已撤下**：页面实现保留在 `Pages/PageLink/PageLinkP2P`，导航里不再出现——纯直连要求至少一方具备公网 IP，双方都在 NAT 后面就必然连不上，作为默认入口体验太差。需要时在 `PageLinkLeft.xaml` 取消 `ItemP2P` 注释即可恢复
 
-**此页浏览量**（总计 / 今日）：[![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Community/PCL-CE)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Community/PCL-CE&web=true)
-## ❤️ 贡献者
+### 变更：账号
 
-[![](https://contrib.rocks/image?repo=PCL-Community/PCL-CE)](https://github.com/PCL-Community/PCL-CE/graphs/contributors)
+- 新建档案只提供「微软账号」与「第三方验证」两种方式，**离线登录入口已移除**。已存在的离线档案不受影响，仍可正常启动
+
+### 调整：界面
+
+- 移除主页右侧常驻的社区版提示卡片
+- 标题栏 Logo 后加 `FIX` 标识，便于和上游构建区分
+- 默认游戏窗口标题改为 `玩家：{user} 登录方式：{login} 版本：{version} 时间：{date} {time}`
+- 「工具」页里的联机入口已移除，联机统一走顶栏的「联机」页
+- P2P 联机页暂时隐藏：导航里只留「中继联机」，进联机页直接落在中继面板；P2P 页代码与其房间码 / 对端地址 / 协议栈三选一逻辑都原样保留，恢复只需在 `PageLinkLeft.xaml` 里取消 `ItemP2P` 的注释
+- 「设置 → 联机（EasyTier）」整页删除：用户名、协议偏好、延迟优先、对称 NAT 端口猜测、Cli 调试输出这些选项只在 EasyTier 直连时生效，直连入口隐藏后已无处可达，连「工具」分类与「隐藏功能」里对应的勾选框一并移除
+
+## 功能
+
+以下均为上游已有能力，本分支原样保留：
+
+- 版本安装、整合包导入、模组 / 资源包 / 存档管理
+- 模组与资源下载（CurseForge、Modrinth）
+- **联机**：EasyTier 隧道、公共中继节点与自建中继服务器配置（本分支在此基础上重构，见上文）
+- 微软正版登录、皮肤与披风管理、多账号切换
+- Java 自动检测与安装、崩溃分析、日志导出
+
+## 下载
+
+从 [Releases](https://github.com/Havesten/PCL-CE/releases/latest) 取最新构建，单文件 exe，解压即用，无安装程序。
+
+环境要求与上游一致：Windows 10 1809 (17763) 及以上，需安装 [.NET 10 Desktop Runtime](https://get.dot.net/10)。
+
+## 从源码构建
+
+需要 .NET 10 SDK 与 Windows 环境：
+
+```bash
+dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
+  -c Release -p:Platform=x64 -o ./artifact --no-self-contained
+```
+
+### 可选：编译期密钥
+
+自编译版本**不含任何内置密钥**，相关能力会降级但不影响启动游戏：
+
+| 环境变量                             | 缺失时的表现                                                 |
+| -------------------------------- | ------------------------------------------------------ |
+| `PCL_CURSEFORGE_API_KEY`         | CurseForge 官方接口返回 403，自动回退 mcim 镜像（需把下载源设为「自动」或「优先镜像」） |
+| `PCL_MS_CLIENT_ID`               | 微软正版登录不可用，仅能使用离线登录                                     |
+| `PCL_NAID_CLIENT_ID` / `_SECRET` | Natayark ID 登录不可用（大厅已移除，通常不再需要）                        |
+
+
+
+```bash
+PCL_WRITE_SECRET=1 \
+PCL_CURSEFORGE_API_KEY='$2a$10$...' \
+PCL_MS_CLIENT_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' \
+  dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
+  -c Release -p:Platform=x64 -o ./artifact --no-self-contained
+```
+
+注意 `$` 在 bash 双引号中会被展开，key 请用单引号包裹。
+
+## 已知问题
+
+- **更新服务默认指向一个已失效的地址**，启动器会跳过在线更新检查
+- 节点优选首轮耗时较长（约 4–5 分钟，取决于网络），结果带 1 小时缓存
+- 未内置 CurseForge key 时，搜索结果的排序与部分字段与官方略有差异
+
+## 反馈
+
+**本分支的问题不要提交给 PCL 或 PCL CE 上游** —— 上游无法复现这里的改动，提交过去只会增加他们的负担。
+
+请在本仓库 [提交 Issue](https://github.com/Havesten/PCL-CE/issues/new/choose)，附上启动器日志（`PCL/Log/` 下对应文件）。
+
+## 致谢与许可
+
+这个分支能存在，完全依赖龙腾猫跃把 PCL 的源码开放出来，以及 PCL CE 社区持续的维护。如果它帮到了你，请赞助原作者：[afdian.com/a/LTCat](https://afdian.com/a/LTCat)。
+
+许可说明：
+
+- `Plain Craft Launcher 2/` 目录适用《PCL 分发有限许可》与《PCL 存储库合理使用指南》，全文见 [`Plain Craft Launcher 2/LICENCE`](Plain%20Craft%20Launcher%202/LICENCE)。本分支按其中「重度使用」条款处理：
+  - 明确声明为第三方基于 PCL 独立进行的二次创作，非官方版本
+  - 名称以 PCL 开头，并带表示第三方修改的后缀
+  - 保留关于页首位的原作者署名与赞助入口，并公开本仓库源码
+  - 保留 Minecraft 正版购买劝导（`McLaunchPrecheck`）与赞助劝导
+  - 不提供任何与赞助解锁类似的功能，界面主色保持蓝色
+- 其余目录适用 [Apache License 2.0](LICENSE)
+
+本分支免费分发，不收取任何费用，也没有任何形式的付费版本或赞助门槛。
+
+## Star 历史
+
+<a href="https://www.star-history.com/?repos=Havesten%2FPCL-CE\&type=date\&legend=top-left">  
+  <img src="https://api.star-history.com/chart?repos=Havesten/PCL-CE\&type=date\&legend=top-left" alt="Star History" width="600">  
+</a>

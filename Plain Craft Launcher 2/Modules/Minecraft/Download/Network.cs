@@ -9,6 +9,11 @@ public static partial class GameDownload
 {
     private static bool _dlPreferMojang;
 
+    /// <summary>
+    ///     「仅使用官方源」选项对应的配置取值，此时不再回退到任何镜像源。
+    /// </summary>
+    public const int OfficialOnlySourceValue = 3;
+
     private static readonly string[] SourceArray = ["minecraftforge", "fabricmc", "neoforged"];
 
     /// <summary>
@@ -48,6 +53,12 @@ public static partial class GameDownload
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 5));
                     urls.Add(new KeyValuePair<string, int>(url, 15));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
+                    break;
+                }
+                case OfficialOnlySourceValue:
+                {
+                    urls.Add(new KeyValuePair<string, int>(url, 5));
+                    urls.Add(new KeyValuePair<string, int>(url, 15));
                     break;
                 }
 
@@ -129,6 +140,12 @@ public static partial class GameDownload
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
                     break;
                 }
+                case OfficialOnlySourceValue:
+                {
+                    urls.Add(new KeyValuePair<string, int>(url, 5));
+                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    break;
+                }
 
                 default:
                 {
@@ -166,26 +183,34 @@ public static partial class GameDownload
 
     /// <summary>
     ///     下载文件（而非获取版本列表）的时候，根据是否优先使用官方源决定使用 Url 的顺序。
+    ///     若选择「仅使用官方源」，则完全不返回镜像地址。
     /// </summary>
     public static IEnumerable<string> DlSourceOrder(
         IEnumerable<string> officialUrls,
         IEnumerable<string> mirrorUrls)
     {
+        var official = officialUrls.ToList();
+        if (Config.Download.FileSource == OfficialOnlySourceValue)
+            return official.Distinct();
         return DlSourcePreferMojang
-            ? officialUrls.Union(mirrorUrls)
-            : mirrorUrls.Union(officialUrls);
+            ? official.Union(mirrorUrls)
+            : mirrorUrls.Union(official);
     }
 
     /// <summary>
     ///     获取版本列表（而非下载文件）的时候，根据是否优先使用官方源决定使用 Url 的顺序。
+    ///     若选择「仅使用官方源」，则完全不返回镜像地址。
     /// </summary>
     public static IEnumerable<string> DlVersionListOrder(
         IEnumerable<string> officialUrls,
         IEnumerable<string> mirrorUrls)
     {
+        var official = officialUrls.ToList();
+        if (Config.Download.VersionListSource == OfficialOnlySourceValue)
+            return official.Distinct();
         return DlVersionListPreferMojang
-            ? officialUrls.Union(mirrorUrls)
-            : mirrorUrls.Union(officialUrls);
+            ? official.Union(mirrorUrls)
+            : mirrorUrls.Union(official);
     }
 
     /// <summary>
@@ -364,6 +389,12 @@ public static partial class GameDownload
                 res.Add(original);
                 break;
             }
+            case OfficialOnlySourceValue:
+            {
+                res.Add(original);
+                res.Add(original);
+                break;
+            }
 
             default:
             {
@@ -382,6 +413,14 @@ public static partial class GameDownload
         List<KeyValuePair<Loading.LoaderTask<InputType, OutputType>, int>> loaderList,
         bool isForceRestart = false)
     {
+        // 「仅使用官方源」时拒绝任何镜像回退。
+        // 各来源方案的默认分支均以官方加载器打头，因此只保留首项即可覆盖全部加载器的版本列表。
+        if (Config.Download.VersionListSource == OfficialOnlySourceValue && loaderList.Count > 1)
+        {
+            Common.Log("[Download] 已选择仅使用官方源，忽略镜像加载器");
+            loaderList = [loaderList[0]];
+        }
+
         var waitCycle = 0;
         while (true)
         {

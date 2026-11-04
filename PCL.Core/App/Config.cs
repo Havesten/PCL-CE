@@ -1,4 +1,4 @@
-using PCL.Core.App.Configuration;
+﻿using PCL.Core.App.Configuration;
 
 namespace PCL.Core.App;
 
@@ -77,6 +77,16 @@ public static partial class Config
         [ConfigItem<DownloadHttpMode>("ToolDownloadHttpMode", DownloadHttpMode.Auto)] public partial DownloadHttpMode HttpMode { get; set; }
         [ConfigItem<int>("ToolDownloadSource", 1)] public partial int FileSource { get; set; }
         [ConfigItem<int>("ToolDownloadVersion", 1)] public partial int VersionListSource { get; set; }
+
+        /// <summary>
+        ///     是否在下载时把官方 CDN 域名锁定到优选出的节点 IP。
+        /// </summary>
+        [ConfigItem<bool>("ToolDownloadCdnPin", false)] public partial bool CdnPinEnabled { get; set; }
+
+        /// <summary>
+        ///     官方 CDN 节点锁定表，以 JSON 对象保存「域名 → IP」。
+        /// </summary>
+        [ConfigItem<string>("ToolDownloadCdnPinMap", "")] public partial string CdnPinMap { get; set; }
         [ConfigItem<bool>("ToolDownloadAutoSelectVersion", true)] public partial bool AutoSelectInstance { get; set; }
         [ConfigItem<bool>("ToolFixAuthlib", true)] public partial bool FixAuthLib { get; set; }
 
@@ -121,11 +131,6 @@ public static partial class Config
         /// 更新分支。
         /// </summary>
         [ConfigItem<UpdateChannel>("SystemUpdateChannel", UpdateChannel.Release, ConfigSource.Local)] public partial UpdateChannel UpdateChannel { get; set; }
-            
-        /// <summary>
-        /// Mirror 酱 CDK。
-        /// </summary>
-        [ConfigItem<string>("SystemMirrorChyanKey", "", ConfigSource.SharedEncrypt)] public partial string MirrorChyanKey { get; set; }
     }
 
     /// <summary>
@@ -169,10 +174,20 @@ public static partial class Config
         [ConfigItem<bool>("LinkTryPunchSym", true)] public partial bool TryPunchSym { get; set; }
 
         /// <summary>
-        /// 启用 IPv6。
+        /// 使用的 IP 协议栈。取代旧的 LinkEnableIPv6 布尔开关，三态更贴近实际可选项。
         /// </summary>
-        [ConfigItem<bool>("LinkEnableIPv6", true)] public partial bool EnableIPv6 { get; set; }
-        
+        [ConfigItem<LinkIpMode>("LinkIpMode", LinkIpMode.Auto)] public partial LinkIpMode IpMode { get; set; }
+
+        /// <summary>
+        /// 纯直连模式下对方填的地址（IP 或域名，可带端口）。
+        /// </summary>
+        [ConfigItem<string>("LinkManualPeer", "")] public partial string ManualPeer { get; set; }
+
+        /// <summary>
+        /// 纯直连模式下本机的监听端口，双方需要事先约定。
+        /// </summary>
+        [ConfigItem<int>("LinkManualPort", 11010)] public partial int ManualPort { get; set; }
+
         /// <summary>
         /// 在日志中输出 Cli 信息以用于调试。
         /// </summary>
@@ -439,13 +454,11 @@ public static partial class Config
             [ConfigItem<bool>("UiHiddenSetupGameManage", false, ConfigSource.Local)] public partial bool SetupGameManage { get; set; }
             [ConfigItem<bool>("UiHiddenSetupJava", false, ConfigSource.Local)] public partial bool SetupJava { get; set; }
             [ConfigItem<bool>("UiHiddenSetupUpdate", false, ConfigSource.Local)] public partial bool SetupUpdate { get; set; }
-            [ConfigItem<bool>("UiHiddenSetupGameLink", false, ConfigSource.Local)] public partial bool SetupGameLink { get; set; } // 新增
             [ConfigItem<bool>("UiHiddenSetupAbout", false, ConfigSource.Local)] public partial bool SetupAbout { get; set; } // 修正名称
             [ConfigItem<bool>("UiHiddenSetupFeedback", false, ConfigSource.Local)] public partial bool SetupFeedback { get; set; } // 修正名称
             [ConfigItem<bool>("UiHiddenSetupLog", false, ConfigSource.Local)] public partial bool SetupLog { get; set; } // 修正名称
 
             // 子页面 工具
-            [ConfigItem<bool>("UiHiddenToolsGameLink", false, ConfigSource.Local)] public partial bool ToolsGameLink { get; set; } // 新增
             [ConfigItem<bool>("UiHiddenToolsTest", false, ConfigSource.Local)] public partial bool ToolsTest { get; set; } // 新增
 
             // 子页面 实例设置
@@ -554,7 +567,8 @@ public static partial class Config
         /// <summary>
         /// 游戏窗口标题。
         /// </summary>
-        [ConfigItem<string>("LaunchArgumentTitle", "", ConfigSource.Local)] public partial string Title { get; set; }
+        [ConfigItem<string>("LaunchArgumentTitle", "玩家：{user} 登录方式：{login} 版本：{version} 时间：{date} {time}", ConfigSource.Local)]
+        public partial string Title { get; set; }
 
         /// <summary>
         /// 自定义左下角版本信息。

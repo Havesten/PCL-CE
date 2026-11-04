@@ -17,16 +17,25 @@ public readonly struct DialogButtons(DialogButton first, DialogButton second = d
         _ => throw new ArgumentOutOfRangeException(nameof(index))
     };
 
-    /// <summary>按钮数量，从第一个空位开始计算。</summary>
+    /// <summary>
+    ///     按钮组的有效长度，即最靠后的非空按钮所在位置。
+    ///     <p>
+    ///         中间允许留空：例如「按钮1 + 空 + 关闭」这种组合，长度必须算到 3，
+    ///         否则最后那个「关闭」会被当成不存在而不显示，用户就再也关不掉弹窗了。
+    ///     </p>
+    /// </summary>
     public int Length
     {
         get
         {
-            if (first.IsEmpty) return 0;
-            if (second.IsEmpty) return 1;
-            return third.IsEmpty ? 2 : 3;
+            if (!third.IsEmpty) return 3;
+            if (!second.IsEmpty) return 2;
+            return first.IsEmpty ? 0 : 1;
         }
     }
+
+    /// <summary>实际存在的按钮数量（跳过中间的空位）。</summary>
+    public int Count => (first.IsEmpty ? 0 : 1) + (second.IsEmpty ? 0 : 1) + (third.IsEmpty ? 0 : 1);
 
     public bool IsEmpty => first.IsEmpty;
 

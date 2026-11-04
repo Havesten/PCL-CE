@@ -14,16 +14,28 @@ public static class UpdateManager
 {
     public static bool isUpdateWaitingRestart;
 
+    /// <summary>
+    ///     更新源。目前只指向自建服务（cloud/pcl-cloud），不再向社区公共源发起请求。
+    ///     <para>
+    ///         地址统一由 <see cref="CloudEndpoints" /> 提供，与中继联机 API 共用同一个根地址。
+    ///         自建服务实现了同一套 apiv2 协议：
+    ///         版本清单取 <c>{基地址}apiv2/updates/updates-{通道}{架构}.json</c>，
+    ///         公告取 <c>{基地址}apiv2/announcement.json</c>，缓存键取 <c>{基地址}apiv2/cache.json</c>。
+    ///     </para>
+    /// </summary>
     public static UpdatesWrapperModel remoteServer = new(new List<IUpdateSource>
     {
-        new UpdatesMirrorChyanModel(),
-        new UpdatesRandomModel(new[]
-        {
-            new UpdatesMinioModel("https://s3.pysio.online/pcl2-ce/", "Pysio"),
-            new UpdatesMinioModel("https://staticassets.naids.com/resources/pclce/", "Naids")
-        }),
-        new UpdatesMinioModel("https://github.com/PCL-Community/PCL2_CE_Server/raw/main/", "GitHub")
+        new UpdatesMinioModel(CloudEndpoints.UpdateRoot, "Fuukir")
     });
+
+    /// <summary>
+    ///     是否启用启动器在线服务：启动时的自动更新检查、服务端公告、更新页的自动检查。
+    ///     <para>
+    ///         置为 <c>false</c> 后启动阶段不再向更新源发起任何版本或公告请求，也不会弹出公告；
+    ///         更新页仍可手动点击「检查更新」。
+    ///     </para>
+    /// </summary>
+    public const bool OnlineServiceEnabled = false;
 
     public static bool IsCurrentVersionBeta
     {
@@ -37,6 +49,9 @@ public static class UpdateManager
     
     public static UpdateEnums.VersionStatus GetVersionStatus()
     {
+        // 在线服务关闭时没有版本元数据可用，直接给出「未知」，避免误报「启动器已过期」
+        if (!OnlineServiceEnabled) return UpdateEnums.VersionStatus.Unknown;
+
         try
         {
             if (IsCurrentVersionBeta && (int)Config.Update.UpdateChannel != 1)
@@ -264,6 +279,12 @@ public static class UpdateManager
 
     private static void LoadOnlineInfo()
     {
+        if (!OnlineServiceEnabled)
+        {
+            Common.Log("[Update] 在线服务已禁用，跳过自动更新检查与公告加载");
+            return;
+        }
+
         ScheduleBasedOnConfig();
         AnnouncementService.Load();
     }
@@ -289,21 +310,5 @@ public static class UpdateManager
                 Common.Log("[Update] 更新设置: 不自动检查更新");
                 return;
         }
-    }
-
-    /// <summary>
-    ///     展示社区版提示
-    /// </summary>
-    /// <param name="IsUpdate">是否为更新时启动</param>
-    public static void ShowCEAnnounce()
-    {
-        _ = DialogService.Instance.ShowAsync(new TextDialogRequest
-        {
-            Title = Lang.Text("Update.CommunityNotice.Title"),
-            Content = Lang.Text("Update.CommunityNotice.Body"),
-            Buttons = DialogButtons.From(
-                DialogButton.Create(Lang.Text("Update.CommunityNotice.Confirm"))),
-            ForceWait = true
-        });
     }
 }

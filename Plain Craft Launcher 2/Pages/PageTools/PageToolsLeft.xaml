@@ -8,34 +8,6 @@
                   xmlns:loc="https://ce.pclc.cc/core/localization">
     <StackPanel Orientation="Vertical" x:Name="PanItem" Margin="0,12,0,0">
 
-        <TextBlock Text="{loc:Loc Tools.Left.Multiplayer}"
-                   Margin="13,5,5,3"
-                   Opacity="0.6" FontSize="12"
-                   x:Name="TextGameLinkCategory" />
-
-        <local:MyListItem x:Name="ItemGameLink"
-                          IsScaleAnimationEnabled="False"
-                          Type="RadioBox" Tag="1"
-                          Check="PageCheck"
-                          MinPaddingRight="35" Height="36"
-                          VerticalAlignment="Top"
-                          Title="{loc:Loc Tools.Left.Lobby}"
-                          LogoScale="0.85"
-                          SvgIcon="lucide/link-2">
-            <local:MyListItem.Buttons>
-                <x:Array Type="{x:Type local:MyIconButton}">
-                    <local:MyIconButton Tag="1"
-                                        ToolTip="{loc:Loc Common.Action.Refresh}"
-                                        ToolTipService.Placement="Right"
-                                        ToolTipService.InitialShowDelay="200"
-                                        ToolTipService.VerticalOffset="-1"
-                                        LogoScale="0.85"
-                                        Click="Refresh"
-                                        SvgIcon="lucide/refresh-cw" />
-                </x:Array>
-            </local:MyListItem.Buttons>
-        </local:MyListItem>
-
         <TextBlock Text="{loc:Loc Tools.Left.Utilities}" Margin="13,5,5,3" Opacity="0.6"
                    FontSize="12"
                    x:Name="TextToolsCategory" />
