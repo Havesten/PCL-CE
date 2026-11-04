@@ -40,6 +40,7 @@ public sealed class TunnelClient : IDisposable
     private const int MaxFrameSize = 1 << 20; // 1 MB
     private const int MaxDataConnections = 128; // 并发数据连接上限
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan AuthRetryDelay = TimeSpan.FromSeconds(2);
 
     private readonly RelayTunnel _tunnel;
     private readonly int _localPort;
@@ -67,56 +68,84 @@ public sealed class TunnelClient : IDisposable
 
     /// <summary>
     ///     启动隧道。成功返回 null，失败返回原因。
+    ///     云端分配的令牌要等节点下一次轮询 state（默认 5 秒）才会进入绑定表，
+    ///     所以 AUTH 被拒（无效令牌）并不一定是真失败：在超时预算内间隔重试，等绑定表收敛。
     /// </summary>
     public async Task<string?> StartAsync(TimeSpan timeout, CancellationToken ct = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = _cts.Token;
+        var deadline = DateTime.UtcNow + timeout;
+        var lastError = "连接超时";
 
-        try
+        while (true)
         {
-            // 1. 连接控制端口
-            _control = new TcpClient { NoDelay = true };
-            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            connectCts.CancelAfter(timeout);
-            await _control.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, connectCts.Token).ConfigureAwait(false);
-            _controlStream = _control.GetStream();
+            try
+            {
+                // 1. 连接控制端口
+                var remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                    return lastError;
+                _control = new TcpClient { NoDelay = true };
+                using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                connectCts.CancelAfter(remaining);
+                await _control.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, connectCts.Token).ConfigureAwait(false);
+                _controlStream = _control.GetStream();
 
-            // 2. AUTH
-            await WriteFrame(_controlStream, FrameAuth, System.Text.Encoding.UTF8.GetBytes(_tunnel.Token), token).ConfigureAwait(false);
-            var (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
-            if (typ == FrameErr)
-                return "鉴权失败：" + System.Text.Encoding.UTF8.GetString(payload);
-            if (typ != FrameOk)
-                return $"意外的响应帧 0x{typ:X2}";
+                // 2. AUTH
+                await WriteFrame(_controlStream, FrameAuth, System.Text.Encoding.UTF8.GetBytes(_tunnel.Token), token).ConfigureAwait(false);
+                var (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
+                if (typ == FrameErr)
+                {
+                    lastError = "鉴权失败：" + System.Text.Encoding.UTF8.GetString(payload);
+                    // 令牌未同步到节点的绑定表是常态（分配与轮询之间的竞态），释放本连接后在预算内重试。
+                    _CloseControl();
+                    if (DateTime.UtcNow + AuthRetryDelay >= deadline)
+                        return lastError;
+                    await Task.Delay(AuthRetryDelay, token).ConfigureAwait(false);
+                    continue;
+                }
+                if (typ != FrameOk)
+                    return $"意外的响应帧 0x{typ:X2}";
 
-            // 3. REGISTER
-            var portBuf = new byte[2];
-            BinaryPrimitives.WriteUInt16BigEndian(portBuf, (ushort)_tunnel.RemotePort);
-            await WriteFrame(_controlStream, FrameRegister, portBuf, token).ConfigureAwait(false);
-            (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
-            if (typ == FrameErr)
-                return "注册失败：" + System.Text.Encoding.UTF8.GetString(payload);
-            if (typ != FrameOk)
-                return $"意外的响应帧 0x{typ:X2}";
+                // 3. REGISTER（端口与令牌强绑定，失败是确定性错误，不重试）
+                var portBuf = new byte[2];
+                BinaryPrimitives.WriteUInt16BigEndian(portBuf, (ushort)_tunnel.RemotePort);
+                await WriteFrame(_controlStream, FrameRegister, portBuf, token).ConfigureAwait(false);
+                (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
+                if (typ == FrameErr)
+                    return "注册失败：" + System.Text.Encoding.UTF8.GetString(payload);
+                if (typ != FrameOk)
+                    return $"意外的响应帧 0x{typ:X2}";
 
-            _running = true;
+                _running = true;
 
-            // 4. 后台监听 NEW_CONN / PING
-            _ = Task.Run(() => ControlLoop(token), token);
-            // 5. 心跳：服务端 90 秒收不到帧就踢线，必须主动 PING
-            _ = Task.Run(() => PingLoop(token), token);
+                // 4. 后台监听 NEW_CONN / PING
+                _ = Task.Run(() => ControlLoop(token), token);
+                // 5. 心跳：服务端 90 秒收不到帧就踢线，必须主动 PING
+                _ = Task.Run(() => PingLoop(token), token);
 
-            return null; // 成功
+                return null; // 成功
+            }
+            catch (OperationCanceledException)
+            {
+                _CloseControl();
+                return lastError;
+            }
+            catch (Exception ex)
+            {
+                _CloseControl();
+                return "隧道连接失败：" + ex.Message;
+            }
         }
-        catch (OperationCanceledException)
-        {
-            return "连接超时";
-        }
-        catch (Exception ex)
-        {
-            return "隧道连接失败：" + ex.Message;
-        }
+    }
+
+    /// <summary>关闭并释放控制连接（重试与失败路径共用）。</summary>
+    private void _CloseControl()
+    {
+        _controlStream = null;
+        _control?.Dispose();
+        _control = null;
     }
 
     /// <summary>
