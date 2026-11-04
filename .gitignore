@@ -348,15 +348,17 @@ MaskFiles/
 **/.DS_Store
 
 # ---- PCLCE-NS 云端/中继服务端（私有，不公开到 GitHub）----
-cloud/
-relay/
-scripts/
+# 注意锚定到仓库根：Windows 下 git 忽略规则不分大小写，
+# 不加 / 会连带忽略 PCL.Core/Link/Relay、Pages/Relay 等客户端目录。
+/cloud/
+/relay/
+/scripts/
 
 # Go 交叉编译产物
 dist/
 
 # 启动器发布产物与运行时数据
-artifact/
+/artifact/
 
 # 工作区/杂项
 .workbuddy/
