@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using PCL.Core.App;
 using PCL.Core.Link.Relay;
 
 namespace PCL;
@@ -26,6 +27,7 @@ public partial class RelayPanel : UserControl
     private bool _banned;
     private bool _hasNodes;
     private bool _busy;
+    private bool _versionTooLow;
 
     public RelayPanel()
     {
@@ -34,7 +36,7 @@ public partial class RelayPanel : UserControl
         // 这个面板常驻在联机页里，只有真正切到这个子页面时才算可见，
         // 所以初始化挂在可见性变化上，避免启动时就发请求。
         IsVisibleChanged += OnVisibleChanged;
-        Application.Current.Exit += (_, _) => _runner?.Dispose();
+        Application.Current.Exit += (_, _) => OnAppExit();
 
         // 停留在页面上时定期刷新：管理员改配额、封号都是即时生效的，
         // 不能等到用户下次切页才看到。
@@ -77,6 +79,7 @@ public partial class RelayPanel : UserControl
 
     private async Task InitializeAsync()
     {
+        await CheckVersionAsync().ConfigureAwait(true);
         if (_session.IsValid)
         {
             ShowLoggedIn();
@@ -87,6 +90,30 @@ public partial class RelayPanel : UserControl
         // 本地没有可用令牌：曾经登录过的会话才算「已过期」，否则就是首次使用
         ShowLogin(_session.ExpiresAt != default);
         await RefreshCaptchaAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     版本门槛预检：云端后台设了「联机客户端版本号」时，客户端版本必须完全一致，
+    ///     不一致（无论高低）都提示版本过低、需要更新，并禁用分配按钮。
+    ///     拿不到状态不拦功能——真正分配时服务端还会再校验一次。
+    /// </summary>
+    private async Task CheckVersionAsync()
+    {
+        try
+        {
+            var status = await _api.GetStatusAsync().ConfigureAwait(true);
+            var required = status.RequiredVersion?.Trim();
+            _versionTooLow = !string.IsNullOrEmpty(required) && required != Basics.VersionName;
+            if (_versionTooLow) SetStatus("版本过低，需要更新");
+        }
+        catch (Exception)
+        {
+            // 状态接口失败不改变既有判定，分配时服务端兜底
+        }
+        finally
+        {
+            UpdateButtons();
+        }
     }
 
     // ---------------------------------------------------------------- 登录
@@ -215,6 +242,7 @@ public partial class RelayPanel : UserControl
         if (!_session.IsValid) return;
         try
         {
+            await CheckVersionAsync().ConfigureAwait(true);
             var me = await _api.GetMeAsync().ConfigureAwait(true);
             ApplyMe(me);
             ApplyQuota(me.Quota);
@@ -296,6 +324,11 @@ public partial class RelayPanel : UserControl
 
     private async void BtnAllocate_Click(object sender, MouseButtonEventArgs e)
     {
+        if (_versionTooLow)
+        {
+            SetStatus("版本过低，需要更新");
+            return;
+        }
         if (!_session.IsValid)
         {
             SetStatus("请先登录");
@@ -396,7 +429,58 @@ public partial class RelayPanel : UserControl
         }
     }
 
-    private void BtnStop_Click(object sender, MouseButtonEventArgs e) => StopTunnel();
+    private async void BtnStop_Click(object sender, MouseButtonEventArgs e) => await StopAndReleaseAsync().ConfigureAwait(true);
+
+    /// <summary>
+    ///     停止按钮 = 停隧道 + 自动释放端口（不留存量分配，下次分配随机给新端口）。
+    ///     释放失败只报状态栏，不回滚「已停止」这个事实。
+    /// </summary>
+    private async Task StopAndReleaseAsync()
+    {
+        var id = _runningAllocationId;
+        StopTunnel();
+        if (id is null)
+        {
+            SetStatus("隧道已停止");
+            return;
+        }
+
+        try
+        {
+            SetBusy(true, "正在停止并释放端口…");
+            await _api.ReleaseAsync(id).ConfigureAwait(true);
+            SetStatus("隧道已停止，端口已自动释放");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("隧道已停止，但端口释放失败：" + ex.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>退出也视为停止：尽力释放占用的端口，失败留给服务端 TTL 兜底，不拦退出。</summary>
+    private void OnAppExit()
+    {
+        var id = _runningAllocationId;
+        _runner?.Dispose();
+        _runner = null;
+        if (id is not null && _session.IsValid)
+        {
+            try
+            {
+                _api.ReleaseAsync(id).Wait(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception)
+            {
+                // 进程正在退出，释放失败由服务端分配 TTL 收口
+            }
+        }
+    }
 
     private void StopTunnel()
     {
@@ -493,10 +577,10 @@ public partial class RelayPanel : UserControl
         UpdateButtons();
     }
 
-    /// <summary>封禁、没有节点、正在忙碌时，分配按钮都不能点。</summary>
+    /// <summary>封禁、没有节点、版本过低、正在忙碌时，分配按钮都不能点。</summary>
     private void UpdateButtons()
     {
-        BtnAllocate.IsEnabled = !_busy && !_banned && _hasNodes;
+        BtnAllocate.IsEnabled = !_busy && !_banned && _hasNodes && !_versionTooLow;
         ComboNodes.IsEnabled = !_banned && _hasNodes;
         BtnLogout.IsEnabled = !_busy;
         BtnRefreshCaptcha.IsEnabled = !_busy;

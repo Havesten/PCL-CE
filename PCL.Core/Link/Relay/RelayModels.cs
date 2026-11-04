@@ -113,7 +113,8 @@ public sealed record RelayStatus(
     [property: JsonPropertyName("captcha")] string Captcha,
     [property: JsonPropertyName("turnstile")] bool Turnstile,
     [property: JsonPropertyName("node_count")] int NodeCount,
-    [property: JsonPropertyName("dev_mode")] bool DevMode);
+    [property: JsonPropertyName("dev_mode")] bool DevMode,
+    [property: JsonPropertyName("required_version")] string? RequiredVersion = null);
 
 internal sealed record RelayErrorBody(
     [property: JsonPropertyName("error")] string? Error);

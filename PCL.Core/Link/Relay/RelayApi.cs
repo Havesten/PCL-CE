@@ -97,6 +97,8 @@ public sealed class RelayApi
     {
         using var request = new HttpRequestMessage(method, BaseUrl.TrimEnd('/') + path);
         if (body is not null) request.Content = JsonContent.Create(body);
+        // 联机功能版本门槛：带上启动器版本号，服务端要求版本不一致时会拒绝分配端口。
+        request.Headers.TryAddWithoutValidation("X-Client-Version", Basics.VersionName);
         if (!string.IsNullOrWhiteSpace(Token))
             request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Token);
 
@@ -176,6 +178,7 @@ public sealed class RelayApi
         "port_quota_exhausted" => "端口配额已用完，请先释放已有端口",
         "node_offline" => "该节点已离线，请换一个",
         "no_port_available" => "该节点端口已分配完，请换一个",
+        "version_too_low" => "版本过低，需要更新",
         "unauthorized" => "登录已失效，请重新登录",
         _ => status == HttpStatusCode.Unauthorized ? "登录已失效，请重新登录" : $"请求失败（{code}）"
     };
