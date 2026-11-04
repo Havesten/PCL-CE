@@ -347,7 +347,7 @@ MaskFiles/
 
 **/.DS_Store
 
-# ---- PCL CE FIX 云端/中继服务端（私有，不公开到 GitHub）----
+# ---- PCLCE-NS 云端/中继服务端（私有，不公开到 GitHub）----
 cloud/
 relay/
 scripts/
