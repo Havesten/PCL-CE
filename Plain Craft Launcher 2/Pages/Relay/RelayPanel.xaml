@@ -139,11 +139,12 @@
                                         <TextBlock Text="{Binding GameAddress}" FontFamily="Consolas"
                                                    FontSize="14" FontWeight="SemiBold" />
                                         <TextBlock Opacity="0.7" Margin="0,6,0,0" TextWrapping="Wrap">
-                                            <Run Text="{Binding NodeName}" />
+                                            <!-- Run.Text 在 WPF 中默认 TwoWay 绑定，PortItem 是只读计算属性，必须显式 OneWay，否则模板一实例化就 XamlParseException -->
+                                            <Run Text="{Binding NodeName, Mode=OneWay}" />
                                             <Run Text=" · " />
-                                            <Run Text="{Binding Label}" />
+                                            <Run Text="{Binding Label, Mode=OneWay}" />
                                             <Run Text=" · 已用 " />
-                                            <Run Text="{Binding UsageText}" />
+                                            <Run Text="{Binding UsageText, Mode=OneWay}" />
                                         </TextBlock>
                                     </StackPanel>
                                 </DockPanel>
