@@ -787,6 +787,10 @@ public partial class PageLaunchLeft : IPageView
     /// <param name="targetLoginType">目标验证方式，若正在创建档案需填</param>
     public void RefreshPage(bool anim, GameLaunch.McLoginType targetLoginType = default)
     {
+        // 第三方 / 离线登录入口已隐藏：任何指向这两个登录页的切换都回落到常规路由，
+        // 与 PageLinkLeft 对 P2P 页的处理一致。需要恢复时去掉这行还原。
+        if (targetLoginType is GameLaunch.McLoginType.Auth or GameLaunch.McLoginType.Legacy)
+            targetLoginType = default;
         var type = default(PageType);
         if (targetLoginType != default)
         {

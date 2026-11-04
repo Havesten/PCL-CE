@@ -227,14 +227,12 @@ public static class ProfileUi
         return uuid;
     }
 
-    public static bool CanCreateOtherProfile()
-    {
-#if DEBUG || DEBUGCI
-        return true;
-#else
-        return ProfileService.HasMicrosoftProfile || (Lang.IsFeaturesUnrestricted && ProfileService.Profiles.Count > 0) || NetworkHelper.IsNetworkAvailable() is false;
-#endif
-    }
+    /// <summary>
+    ///     是否可以创建非微软档案。第三方验证入口已隐藏（与离线登录一致，仅保留存量档案的正常启动与续期）：
+    ///     新建档案只提供微软账号登录。需要恢复入口时改为返回 <see langword="true" />，
+    ///     并同步还原建档选择器的第三方项与 Authlib 拖拽建档。
+    /// </summary>
+    public static bool CanCreateOtherProfile() => false;
 
     public static async Task CreateProfileAsync()
     {
@@ -286,8 +284,9 @@ public static class ProfileUi
     }
 
     /// <summary>
-    ///     可创建的验证方式。离线登录已禁用：本发行版要求所有档案都经过账号验证，
-    ///     不再提供绕过验证的入口（已有的离线档案仍可正常启动，不做破坏性处理）。
+    ///     可创建的验证方式。离线登录已移除，第三方验证入口也已隐藏：
+    ///     新建档案只提供微软账号登录（存量离线与第三方档案不受影响，仍可正常启动与续期）。
+    ///     需要恢复第三方入口时，还原 <see cref="CanCreateOtherProfile" /> 与本方法的第三方项。
     /// </summary>
     private static List<IMyRadio> _GetAvailableProfileSelection(bool includeOthers) => includeOthers
         ? [

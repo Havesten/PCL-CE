@@ -57,7 +57,7 @@ The old Lobby entry and the Natayark account login it depended on are gone — m
 
 ### Changed: accounts
 
-- Creating a profile now only offers "Microsoft account" and "third-party auth"; **the offline login entry is gone**. Existing offline profiles are unaffected and still launch fine
+- Creating a profile now only offers "Microsoft account"; **both the offline and third-party auth entries are hidden**. Existing offline and third-party profiles are unaffected and still launch and refresh fine
 
 ### Changed: interface
 

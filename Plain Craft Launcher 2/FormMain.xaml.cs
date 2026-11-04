@@ -952,34 +952,12 @@ public partial class FormMain
                     Common.Log("[System] 接受文本拖拽：" + str);
                     if (str.StartsWithF("authlib-injector:yggdrasil-server:"))
                     {
-                        // Authlib 拖拽
+                        // Authlib 拖拽：第三方验证建档入口已隐藏，静默忽略（存量第三方档案不受影响，仍可启动与续期）。
+                        // 需要恢复时还原本分支的建档确认流程，并同步恢复 ProfileUi.CanCreateOtherProfile 与建档选择器的第三方项。
                         e.Handled = true;
                         e.Effects = DragDropEffects.Copy;
-                        var authlibServer =
-                            WebUtility.UrlDecode(str.Substring("authlib-injector:yggdrasil-server:".Length));
-                        Common.Log("[System] Authlib 拖拽：" + authlibServer);
-                        if (!new HttpValidator().Validate(authlibServer).IsValid)
-                        {
-                            HintService.Show(Hints.Error(Lang.Text("Main.FileDrag.AuthlibInvalid", authlibServer)));
-                            return;
-                        }
-
-                        if ((DialogService.Instance.Show(new TextDialogRequest
-                        {
-                            Title = Lang.Text("Main.FileDrag.CreateAuthlibProfileTitle"),
-                            Content = Lang.Text("Main.FileDrag.CreateAuthlibProfile", authlibServer),
-                            Buttons = DialogButtons.OkCancel,
-                            ForceWait = true
-                        }).Result?.Button ?? 0) == 2)
-                            return;
-                        Common.RunInUi(() =>
-                        {
-                            PageLoginAuth.draggedAuthServer = authlibServer;
-                            Launcher.frmLaunchLeft.RefreshPage(true, GameLaunch.McLoginType.Auth);
-                        });
-                        if (pageCurrent == PageType.InstanceSetup && PageCurrentSub == PageSubType.VersionSetup)
-                            // 正在服务器选项页，需要刷新设置项显示
-                            Launcher.frmInstanceSetup.Reload();
+                        Common.Log("[System] 忽略 Authlib 拖拽（第三方建档入口已隐藏）："
+                            + WebUtility.UrlDecode(str.Substring("authlib-injector:yggdrasil-server:".Length)));
                     }
                     else if (str.StartsWithF("file:///"))
                     {
