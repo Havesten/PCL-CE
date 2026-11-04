@@ -6,7 +6,7 @@
 
 ![Logo](<Plain Craft Launcher 2/Images/icon.ico>)
 
-# PCL CE FIX
+# PCLCE-NS
 
 基于 PCL 社区版二次开发的第三方分支
 
@@ -64,7 +64,7 @@ Cloudflare 站点会额外改用通用优选 IP 池（`cloudflare.182682.xyz` �
 ### 调整：界面
 
 - 移除主页右侧常驻的社区版提示卡片
-- 标题栏 Logo 后加 `FIX` 标识，便于和上游构建区分
+- 标题栏 Logo 后加 `NS` 标识，便于和上游构建区分
 - 默认游戏窗口标题改为 `玩家：{user} 登录方式：{login} 版本：{version} 时间：{date} {time}`
 - 「工具」页里的联机入口已移除，联机统一走顶栏的「联机」页
 - P2P 联机页暂时隐藏：导航里只留「中继联机」，进联机页直接落在中继面板；P2P 页代码与其房间码 / 对端地址 / 协议栈三选一逻辑都原样保留，恢复只需在 `PageLinkLeft.xaml` 里取消 `ItemP2P` 的注释

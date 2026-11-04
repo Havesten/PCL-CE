@@ -4,7 +4,7 @@
 
 <img src="Plain Craft Launcher 2/Images/icon.ico" alt="Logo" width="80" height="80">
 
-# PCL CE FIX
+# PCLCE-NS
 
 基於 PCL 社群版二次開發的第三方分支
 
@@ -62,7 +62,7 @@ Cloudflare 站點會額外改用通用優選 IP 池（`cloudflare.182682.xyz` �
 ### 調整：介面
 
 - 移除首頁右側常駐的社群版提示卡片
-- 標題列 Logo 後加 `FIX` 標識，便於和上游建置區分
+- 標題列 Logo 後加 `NS` 標識，便於和上游建置區分
 - 預設遊戲視窗標題改為 `玩家：{user} 登入方式：{login} 版本：{version} 時間：{date} {time}`
 - 「工具」頁裡的連線入口已移除，連線統一走頂欄的「連線」頁
 - P2P 連線頁暫時隱藏：導覽裡只留「中繼連線」，進連線頁直接落在中繼面板；P2P 頁程式碼與其房間碼 / 對端位址 / 協定堆疊三選一邏輯都原樣保留，恢復只需在 `PageLinkLeft.xaml` 裡取消 `ItemP2P` 的註解

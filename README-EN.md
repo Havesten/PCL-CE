@@ -4,7 +4,7 @@
 
 <img src="Plain Craft Launcher 2/Images/icon.ico" alt="Logo" width="80" height="80">
 
-# PCL CE FIX
+# PCLCE-NS
 
 A third-party fork of PCL Community Edition
 
@@ -62,7 +62,7 @@ The old Lobby entry and the Natayark account login it depended on are gone — m
 ### Changed: interface
 
 - Removed the persistent community notice card on the home page
-- Added a `FIX` mark after the title bar logo to distinguish this build from upstream
+- Added a `NS` mark after the title bar logo to distinguish this build from upstream
 - Default game window title is now `玩家：{user} 登录方式：{login} 版本：{version} 时间：{date} {time}`
 - The multiplayer entry inside Tools is gone — multiplayer lives only in the title-bar Multiplayer page
 - The P2P multiplayer page is temporarily hidden: navigation lists only "Relay multiplayer", and the multiplayer page opens straight onto the relay panel. The P2P page code and its room-code / peer-address / three-way protocol-stack logic are all kept as-is — uncomment `ItemP2P` in `PageLinkLeft.xaml` to restore it
