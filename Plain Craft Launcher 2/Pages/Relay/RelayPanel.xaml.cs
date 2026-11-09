@@ -262,7 +262,7 @@ public partial class RelayPanel : UserControl
             var result = await DialogService.Instance.ShowAsync(new PhoneBindDialogRequest
             {
                 Title = "绑定手机号",
-                Content = "根据服务端要求，需要绑定手机号后才能使用联机功能。手机号固定 +86，请填写 11 位中国大陆号码。",
+                Content = "根据相关法律法规，使用中继联机服务需要绑定手机号。",
                 Buttons = DialogButtons.From(
                     DialogButton.Create("绑定手机号"),
                     DialogButton.Create("稍后再说")),
