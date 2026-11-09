@@ -87,13 +87,6 @@ public partial class PageLoginProfile : IPageView
 
     private void ProfileContMenuBuild(MyListItem sender, EventArgs e)
     {
-        // 更改 UUID
-        var btnEditUuid = new MyIconButton { SvgIcon = "lucide/pencil", Tag = sender.Tag };
-        btnEditUuid.SetLocalizedValue(FrameworkElement.ToolTipProperty, "Launch.Account.Profile.ChangeUuid");
-        ToolTipService.SetPlacement(btnEditUuid, PlacementMode.Center);
-        ToolTipService.SetVerticalOffset(btnEditUuid, 30d);
-        ToolTipService.SetHorizontalOffset(btnEditUuid, 2d);
-        btnEditUuid.Click += EditProfileUuid;
         // 复制 UUID
         var btnCopyUuid = new MyIconButton { SvgIcon = "lucide/copy", Tag = sender.Tag };
         btnCopyUuid.SetLocalizedValue(FrameworkElement.ToolTipProperty, "Launch.Account.Profile.CopyUuid");
@@ -101,13 +94,6 @@ public partial class PageLoginProfile : IPageView
         ToolTipService.SetVerticalOffset(btnCopyUuid, 30d);
         ToolTipService.SetHorizontalOffset(btnCopyUuid, 2d);
         btnCopyUuid.Click += CopyProfileUuid;
-        // 更改验证服务器名称
-        var btnEditServerName = new MyIconButton { SvgIcon = "lucide/info", Tag = sender.Tag };
-        btnEditServerName.SetLocalizedValue(FrameworkElement.ToolTipProperty, "Launch.Account.Profile.ChangeAuthServerName");
-        ToolTipService.SetPlacement(btnEditServerName, PlacementMode.Center);
-        ToolTipService.SetVerticalOffset(btnEditServerName, 30d);
-        ToolTipService.SetHorizontalOffset(btnEditServerName, 2d);
-        btnEditServerName.Click += EditProfileServer;
         // 删除档案
         var btnDelete = new MyIconButton { SvgIcon = "lucide/trash-2", Tag = sender.Tag };
         btnDelete.SetLocalizedValue(FrameworkElement.ToolTipProperty, "Launch.Account.Profile.Delete");
@@ -115,30 +101,15 @@ public partial class PageLoginProfile : IPageView
         ToolTipService.SetVerticalOffset(btnDelete, 30d);
         ToolTipService.SetHorizontalOffset(btnDelete, 2d);
         btnDelete.Click += DeleteProfile;
-        if (((McProfile)sender.Tag).ProfileType == ProfileType.Offline)
-            sender.Buttons = new[] { btnEditUuid, btnDelete };
-        else
-            sender.Buttons = new[] { btnCopyUuid, btnDelete };
+        sender.Buttons = new[] { btnCopyUuid, btnDelete };
     }
 
     private void BtnNew_Click(object sender, EventArgs e) => _vm.CreateProfileCommand.Execute(null);
-
-    private void EditProfileUuid(object sender, EventArgs e)
-    {
-        var item = FindProfileItem(sender);
-        if (item is not null) _vm.EditUuidCommand.Execute(item);
-    }
 
     private void CopyProfileUuid(object sender, EventArgs e)
     {
         var item = FindProfileItem(sender);
         if (item is not null) _vm.CopyUuidCommand.Execute(item);
-    }
-
-    private void EditProfileServer(object sender, EventArgs e)
-    {
-        var item = FindProfileItem(sender);
-        if (item is not null) _vm.EditServerNameCommand.Execute(item);
     }
 
     private void DeleteProfile(object sender, EventArgs e)

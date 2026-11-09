@@ -73,24 +73,6 @@ public partial class PageLoginProfileViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public async Task EditServerNameAsync(PageLoginProfile.ProfileItem item)
-    {
-        var nameResult = await Dialog.ShowAsync(new InputDialogRequest
-        {
-            Title = Lang.Text("Launch.Account.Profile.EditServerName.Title"),
-            Content = Lang.Text("Launch.Account.Profile.EditServerName.Message"),
-            DefaultValue = item.Profile.ServerName ?? "",
-            Buttons = DialogButtons.OkCancel,
-            HighLight = false
-        });
-        var name = nameResult.IsConfirmed ? nameResult.InputText : null;
-        if (name is not null) ProfileUi.EditAuthServerName(item.Profile, name);
-    }
-
-    [RelayCommand]
-    public void EditUuid(PageLoginProfile.ProfileItem item) => ProfileUi.EditOfflineUuid(item.Profile);
-
-    [RelayCommand]
     public void CopyUuid(PageLoginProfile.ProfileItem item) => Common.ClipboardSet(item.Profile.Uuid);
 
     public void Select(PageLoginProfile.ProfileItem item)
@@ -98,7 +80,5 @@ public partial class PageLoginProfileViewModel : ViewModelBase
         ProfileService.Select(item.Profile);
         Common.Log($"[Profile] 选定档案: {item.Profile.UserName}, 以 {item.Profile.ProfileType} 方式验证");
         GameLaunch.mcLoginMsLoader.State = Common.LoadState.Waiting;
-        GameLaunch.mcLoginAuthLoader.State = Common.LoadState.Waiting;
-        GameLaunch.mcLoginLegacyLoader.State = Common.LoadState.Waiting;
     }
 }

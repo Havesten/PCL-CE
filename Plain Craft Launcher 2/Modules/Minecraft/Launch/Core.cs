@@ -121,38 +121,10 @@ public static partial class GameLaunch
         McProfile selectedProfile,
         string checkResult)
     {
-        var instance = InstanceList.McMcInstanceSelected!;
-        var loginRequirementSolution = Config.InstanceAuth.LoginRequirementSolution[
-            instance.PathInstance
-        ];
-        return loginRequirementSolution switch
-        {
-            1 => selectedProfile.ProfileType != ProfileType.Microsoft
-                ? Lang.Text("Minecraft.Launch.Precheck.RequireMicrosoft")
-                : checkResult,
-
-            2 => selectedProfile.ProfileType is not (ProfileType.Authlib
-                or ProfileType.YggdrasilConnect)
-                ? Lang.Text("Minecraft.Launch.Precheck.RequireThirdParty")
-                : selectedProfile.Server?.BeforeLast("/authserver")
-                != Config.InstanceAuth.AuthServerAddress[instance.PathInstance]
-                    ? Lang.Text("Minecraft.Launch.Precheck.AuthServerMismatch")
-                    : checkResult,
-
-            3 => selectedProfile.ProfileType switch
-            {
-                ProfileType.Offline => Lang.Text(
-                    "Minecraft.Launch.Precheck.RequireMicrosoftOrThirdParty"),
-
-                ProfileType.Authlib or ProfileType.YggdrasilConnect when
-                    (selectedProfile.Server?.BeforeLast("/authserver")
-                        != Config.InstanceAuth.AuthServerAddress[instance.PathInstance]) =>
-                    Lang.Text("Minecraft.Launch.Precheck.AuthServerMismatch"),
-
-                _ => checkResult
-            },
-            _ => checkResult
-        };
+        // 仅支持 Microsoft 登录。
+        return selectedProfile.ProfileType != ProfileType.Microsoft
+            ? Lang.Text("Minecraft.Launch.Precheck.RequireMicrosoft")
+            : checkResult;
     }
 
 #if BETA

@@ -649,16 +649,4 @@ public static partial class Config
         [ConfigItem<string>("VersionArgumentJavaSelect", "使用全局设置")] public partial ArgConfig<string> SelectedJava { get; }
         [ConfigItem<string>("VersionServerEnter", "")] public partial ArgConfig<string> ServerToEnter { get; }
     }
-
-    /// <summary>
-    /// 实例独立配置的认证部分
-    /// </summary>
-    [ConfigGroup("InstanceAuth", ConfigSource.GameInstance)] partial class InstanceAuthConfigGroup
-    {
-        [ConfigItem<int>("VersionServerLoginRequire", 0)] public partial ArgConfig<int> LoginRequirementSolution { get; }
-        [ConfigItem<string>("VersionServerAuthRegister", "")] public partial ArgConfig<string> AuthRegisterAddress { get; }
-        [ConfigItem<string>("VersionServerAuthName", "")] public partial ArgConfig<string> AuthServerDisplayName { get; }
-        [ConfigItem<string>("VersionServerAuthServer", "")] public partial ArgConfig<string> AuthServerAddress { get; }
-        [ConfigItem<bool>("VersionServerLoginLock", false)] public partial ArgConfig<bool> AuthLocked { get; }
-    }
 }

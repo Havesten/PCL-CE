@@ -915,9 +915,7 @@ public partial class FormMain
             if (e.Data.GetDataPresent(DataFormats.Text))
             {
                 var str = (string)e.Data.GetData(DataFormats.Text);
-                if (str.StartsWithF("authlib-injector:yggdrasil-server:"))
-                    e.Effects = DragDropEffects.Copy;
-                else if (str.StartsWithF("file:///")) e.Effects = DragDropEffects.Copy;
+                if (str.StartsWithF("file:///")) e.Effects = DragDropEffects.Copy;
             }
             else if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
@@ -950,16 +948,7 @@ public partial class FormMain
                 {
                     var str = (string)e.Data.GetData(DataFormats.Text);
                     Common.Log("[System] 接受文本拖拽：" + str);
-                    if (str.StartsWithF("authlib-injector:yggdrasil-server:"))
-                    {
-                        // Authlib 拖拽：第三方验证建档入口已隐藏，静默忽略（存量第三方档案不受影响，仍可启动与续期）。
-                        // 需要恢复时还原本分支的建档确认流程，并同步恢复 ProfileUi.CanCreateOtherProfile 与建档选择器的第三方项。
-                        e.Handled = true;
-                        e.Effects = DragDropEffects.Copy;
-                        Common.Log("[System] 忽略 Authlib 拖拽（第三方建档入口已隐藏）："
-                            + WebUtility.UrlDecode(str.Substring("authlib-injector:yggdrasil-server:".Length)));
-                    }
-                    else if (str.StartsWithF("file:///"))
+                    if (str.StartsWithF("file:///"))
                     {
                         // 文件拖拽（例如从浏览器下载窗口拖入）
                         var filePath = WebUtility.UrlDecode(str).Substring("file:///".Length).Replace("/", @"\");

@@ -547,31 +547,7 @@ public partial class PageLaunchLeft : IPageView
     public void PageChangeToLaunching()
     {
         // 修改验证方式
-        switch (ProfileService.Current?.ProfileType)
-        {
-            case ProfileType.Offline:
-            {
-                LabLaunchingMethod.TrySetLocalizedValue("Text", "Launch.Account.Type.Offline");
-                break;
-            }
-            case ProfileType.Microsoft:
-            {
-                LabLaunchingMethod.TrySetLocalizedValue("Text", "Launch.Account.Type.Microsoft");
-                break;
-            }
-            case ProfileType.Authlib:
-            case ProfileType.YggdrasilConnect:
-            {
-                LocalizedText.TryBind(
-                    LabLaunchingMethod,
-                    "Text",
-                    () => Lang.Text("Launch.Account.Type.ThirdParty") +
-                          (!string.IsNullOrEmpty(ProfileService.Current?.ServerName)
-                              ? " / " + ProfileService.Current.ServerName
-                              : ""));
-                break;
-            }
-        }
+        LabLaunchingMethod.TrySetLocalizedValue("Text", "Launch.Account.Type.Microsoft");
 
         // 初始化页面
         LabLaunchingName.Text = InstanceList.McMcInstanceSelected.Name;
@@ -658,11 +634,9 @@ public partial class PageLaunchLeft : IPageView
     private enum PageType
     {
         None,
-        Auth,
         Ms,
         Profile,
-        ProfileSkin,
-        Offline
+        ProfileSkin
     }
 
     /// <summary>
@@ -674,12 +648,6 @@ public partial class PageLaunchLeft : IPageView
     {
         switch (type)
         {
-            case PageType.Auth:
-            {
-                if (Launcher.frmLoginAuth is null)
-                    Launcher.frmLoginAuth = new PageLoginAuth();
-                return Launcher.frmLoginAuth;
-            }
             case PageType.Ms:
             {
                 if (Launcher.frmLoginMs is null)
@@ -697,12 +665,6 @@ public partial class PageLaunchLeft : IPageView
                 if (Launcher.frmLoginProfileSkin is null)
                     Launcher.frmLoginProfileSkin = new PageLoginProfileSkin();
                 return Launcher.frmLoginProfileSkin;
-            }
-            case PageType.Offline:
-            {
-                if (Launcher.frmLoginOffline is null)
-                    Launcher.frmLoginOffline = new PageLoginOffline();
-                return Launcher.frmLoginOffline;
             }
 
             default:
@@ -784,22 +746,13 @@ public partial class PageLaunchLeft : IPageView
     ///     确认当前显示的子页面正确，并刷新该页面。
     /// </summary>
     /// <param name="anim">是否显示动画</param>
-    /// <param name="targetLoginType">目标验证方式，若正在创建档案需填</param>
-    public void RefreshPage(bool anim, GameLaunch.McLoginType targetLoginType = default)
+    /// <param name="toMicrosoftLogin">是否切换到 Microsoft 登录页（新建档案）</param>
+    public void RefreshPage(bool anim, bool toMicrosoftLogin = false)
     {
-        // 第三方 / 离线登录入口已隐藏：任何指向这两个登录页的切换都回落到常规路由，
-        // 与 PageLinkLeft 对 P2P 页的处理一致。需要恢复时去掉这行还原。
-        if (targetLoginType is GameLaunch.McLoginType.Auth or GameLaunch.McLoginType.Legacy)
-            targetLoginType = default;
         var type = default(PageType);
-        if (targetLoginType != default)
+        if (toMicrosoftLogin)
         {
-            if (targetLoginType == GameLaunch.McLoginType.Ms)
-                type = PageType.Ms;
-            if (targetLoginType == GameLaunch.McLoginType.Auth)
-                type = PageType.Auth;
-            if (targetLoginType == GameLaunch.McLoginType.Legacy)
-                type = PageType.Offline;
+            type = PageType.Ms;
         }
         else if (ProfileService.Current is not null)
         {
@@ -854,8 +807,7 @@ public partial class PageLaunchLeft : IPageView
 
         if (string.IsNullOrEmpty(userName))
         {
-            data.output = Common.PathImage + "Skins/" + Skin.McSkinVariant(ProfileUi.GetOfflineUuid(userName)) +
-                          ".png";
+            data.output = Common.PathImage + "Skins/" + Skin.McSkinVariant(uuid) + ".png";
             Common.Log("[Minecraft] 获取微软正版皮肤失败，ID 为空");
             goto Finish;
         }
@@ -882,7 +834,7 @@ public partial class PageLaunchLeft : IPageView
             if (ex.ToString().Contains("429"))
             {
                 data.output = Common.PathImage + "Skins/" +
-                              Skin.McSkinVariant(ProfileUi.GetOfflineUuid(userName)) + ".png";
+                              Skin.McSkinVariant(uuid) + ".png";
                 Common.Log(
                     Lang.Text("Launch.Skin.Error.MsRateLimited", userName),
                     Common.LogLevel.Hint,
@@ -891,13 +843,13 @@ public partial class PageLaunchLeft : IPageView
             else if (ex.ToString().Contains("未设置自定义皮肤"))
             {
                 data.output = Common.PathImage + "Skins/" +
-                               Skin.McSkinVariant(ProfileUi.GetOfflineUuid(userName)) + ".png";
+                               Skin.McSkinVariant(uuid) + ".png";
                 Common.Log("[Minecraft] 用户未设置自定义皮肤，跳过皮肤加载");
             }
             else
             {
                 data.output = Common.PathImage + "Skins/" +
-                               Skin.McSkinVariant(ProfileUi.GetOfflineUuid(userName)) + ".png";
+                               Skin.McSkinVariant(uuid) + ".png";
                 Common.Log(
                     ex,
                     Lang.Text("Launch.Skin.Error.MsGet", userName),
@@ -915,117 +867,10 @@ public partial class PageLaunchLeft : IPageView
             data.input = null; // 清空输入，因为皮肤实际上没有被渲染，如果不清空切换到页面的 Start 会由于输入相同而不渲染
     }
 
-    // 离线皮肤
-    public static Loading.LoaderTask<Common.EqualableList<string>, string> skinLegacy = new("Loader Skin Legacy",
-        SkinLegacyLoad, inputDelegate: SkinLegacyInput, priority: ThreadPriority.AboveNormal);
-
-    private static Common.EqualableList<string> SkinLegacyInput()
-    {
-        return new Common.EqualableList<string>
-            { ProfileService.Current?.UserName ?? "", ProfileService.Current?.Uuid ?? "" };
-    }
-
-    private static void SkinLegacyLoad(Loading.LoaderTask<Common.EqualableList<string>, string> data)
-    {
-        // 清空已有皮肤
-        Common.RunInUi(() =>
-        {
-            if (Launcher.frmLoginProfileSkin is not null && Launcher.frmLoginProfileSkin.Skin is not null)
-                Launcher.frmLoginProfileSkin.Skin.Clear();
-        });
-        data.output = Common.PathImage + "Skins/" + Skin.McSkinVariant(data.input[1]) + ".png";
-        // 刷新显示
-        if (Launcher.frmLoginProfileSkin is not null && ReferenceEquals(Launcher.frmLoginProfileSkin.Skin.loader, data))
-            Common.RunInUi(() => Launcher.frmLoginProfileSkin.Skin.Load());
-        else if (!data.IsAborted) // 如果已经中断，Input 也被清空，就不会再次刷新
-            data.input = null; // 清空输入，因为皮肤实际上没有被渲染，如果不清空切换到页面的 Start 会由于输入相同而不渲染
-    }
-
-    // Authlib-Injector 皮肤
-    public static Loading.LoaderTask<Common.EqualableList<string>, string> skinAuth = new("Loader Skin Auth",
-        SkinAuthLoad, inputDelegate: SkinAuthInput, priority: ThreadPriority.AboveNormal);
-
-    private static Common.EqualableList<string> SkinAuthInput()
-    {
-        // 获取名称
-        return new Common.EqualableList<string>
-            { ProfileService.Current?.UserName ?? "", ProfileService.Current?.Uuid ?? "" };
-    }
-
-    private static void SkinAuthLoad(Loading.LoaderTask<Common.EqualableList<string>, string> data)
-    {
-        // 清空已有皮肤
-        // 如果在输入时清空皮肤，若输入内容一样则不会执行 Load 方法，导致皮肤不被加载
-        Common.RunInUi(() =>
-        {
-            if (Launcher.frmLoginProfileSkin is not null && Launcher.frmLoginProfileSkin.Skin is not null)
-                Launcher.frmLoginProfileSkin.Skin.Clear();
-        });
-        // 获取 Url
-        var userName = data.input[0];
-        var uuid = data.input[1];
-        if (string.IsNullOrEmpty(userName))
-        {
-            data.output = Common.PathImage + "Skins/Steve.png";
-            Common.Log("[Minecraft] 获取 Authlib-Injector 皮肤失败，ID 为空");
-            goto Finish;
-        }
-
-        try
-        {
-            var result = Skin.McSkinGetAddress(uuid, "Auth");
-            if (data.IsAborted)
-                throw new ThreadInterruptedException("当前任务已取消：" + userName);
-            result = Skin.McSkinDownload(result);
-            if (data.IsAborted)
-                throw new ThreadInterruptedException("当前任务已取消：" + userName);
-            data.output = result;
-        }
-        catch (Exception ex)
-        {
-            if (ex is ThreadInterruptedException)
-            {
-                data.output = "";
-                return;
-            }
-
-            if (ex.ToString().Contains("429"))
-            {
-                data.output = Common.PathImage + "Skins/Steve.png";
-                Common.Log(
-                    $"[Minecraft] 获取 Authlib-Injector 皮肤失败（{userName}）：获取皮肤太过频繁，请 5 分钟后再试！",
-                    Common.LogLevel.Hint,
-                    userSummary: Lang.Text("Launch.Skin.Error.AuthlibRateLimited"));
-            }
-            else if (ex.ToString().Contains("未设置自定义皮肤"))
-            {
-                data.output = Common.PathImage + "Skins/Steve.png";
-                Common.Log("[Minecraft] 用户未设置自定义皮肤，跳过皮肤加载");
-            }
-            else
-            {
-                data.output = Common.PathImage + "Skins/Steve.png";
-                Common.Log(
-                    ex,
-                    Lang.Text("Launch.Skin.Error.AuthGet", userName),
-                    Common.LogLevel.Hint,
-                    userSummary: Lang.Text("Launch.Skin.Error.AuthGet", userName));
-            }
-        }
-
-        Finish: ;
-
-        // 刷新显示
-        if (Launcher.frmLoginProfileSkin is not null && ReferenceEquals(Launcher.frmLoginProfileSkin.Skin.loader, data))
-            Common.RunInUi(Launcher.frmLoginProfileSkin.Skin.Load);
-        else if (!data.IsAborted) // 如果已经中断，Input 也被清空，就不会再次刷新
-            data.input = null; // 清空输入，因为皮肤实际上没有被渲染，如果不清空切换到页面的 Start 会由于输入相同而不渲染
-    }
-
     // 全部皮肤加载器
     // 需要放在其中元素的后面，否则会因为它提前被加载而莫名其妙变成 Nothing
     public static List<Loading.LoaderTask<Common.EqualableList<string>, string>> skinLoaders = new()
-        { skinMs, skinLegacy, skinAuth };
+        { skinMs };
 
     #endregion
 }

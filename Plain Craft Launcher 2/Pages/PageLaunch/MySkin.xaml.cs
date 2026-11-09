@@ -307,11 +307,10 @@ public partial class MySkin
                     if (Directory.Exists(Common.pathTemp + @"Cache\Uuid"))
                         Common.DeleteDirectory(Common.pathTemp + @"Cache\Uuid");
                     Common.IniClearCache(Common.pathTemp + @"Cache\Skin\IndexMs.ini");
-                    Common.IniClearCache(Common.pathTemp + @"Cache\Skin\IndexAuth.ini");
                     Common.IniClearCache(Common.pathTemp + @"Cache\Uuid\Mojang.ini");
                     foreach (var SkinLoader in sender is not null
                                  ? new[] { sender }
-                                 : new[] { PageLaunchLeft.skinLegacy, PageLaunchLeft.skinMs })
+                                 : new[] { PageLaunchLeft.skinMs })
                         SkinLoader.WaitForExit(isForceRestart: true);
                     HintService.Show(Hints.Success(Lang.Text("Launch.Skin.RefreshSuccess")));
                 }

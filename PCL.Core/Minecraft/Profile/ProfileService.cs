@@ -146,7 +146,7 @@ public partial class ProfileService
         var canUseExisting = existing?.ProfileType == profileType;
 
         if (canUseExisting && !request.ForceRefresh &&
-            (profileType is ProfileType.Microsoft or ProfileType.YggdrasilConnect) &&
+            profileType == ProfileType.Microsoft &&
             existing!.ExpiresAt is { } expires &&
             expires > DateTimeOffset.UtcNow.AddMinutes(1) &&
             !string.IsNullOrWhiteSpace(existing.AccessToken))
@@ -155,31 +155,10 @@ public partial class ProfileService
             return existing;
         }
 
-        var provider = await _CreateProviderAsync(profileType, request, existing, token).ConfigureAwait(false);
+        var provider = _CreateProvider(profileType);
         AuthenticationResult? result = null;
 
-        if (canUseExisting && profileType == ProfileType.Authlib && !request.ForceRefresh &&
-            !request.ForceReselectProfile)
-        {
-            try
-            {
-                if (await provider.ValidateAsync(existing!, token).ConfigureAwait(false))
-                {
-                    if (select) Select(existing!);
-                    return existing!;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Context.Warn("验证第三方档案失败，将尝试刷新", ex);
-            }
-        }
-
-        if (canUseExisting && (!request.ForceReselectProfile || profileType != ProfileType.Authlib))
+        if (canUseExisting)
         {
             try
             {
@@ -210,21 +189,13 @@ public partial class ProfileService
                     if (select) Select(existing!);
                     return existing!;
                 }
-                if (profileType == ProfileType.Authlib &&
-                    !string.IsNullOrWhiteSpace(request.Username) && !string.IsNullOrWhiteSpace(request.Password))
-                {
-                    Context.Warn("刷新第三方档案失败，将尝试使用凭据重新认证", ex);
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
         }
 
         if (result is null)
         {
-            var loginRequest = request with { RefreshToken = null, IdToken = existing?.IdToken ?? request.IdToken };
+            var loginRequest = request with { RefreshToken = null };
             result = await provider.AuthenticateAsync(loginRequest, token).ConfigureAwait(false);
         }
 
@@ -245,13 +216,7 @@ public partial class ProfileService
         profile.TokenType = result.TokenType;
         profile.ExpiresAt = result.ExpiresAt;
         profile.RawJson = result.RawJson;
-        profile.Server = result.Server ?? profile.Server;
-        profile.ServerName = result.ServerName ?? profile.ServerName;
-        profile.LoginName = result.LoginName ?? profile.LoginName;
-        profile.Password = result.Password ?? profile.Password;
         profile.Provider = result.Provider ?? profile.Provider;
-        profile.DiscoveryAddress = result.DiscoveryAddress ?? profile.DiscoveryAddress;
-        profile.IdToken = result.IdToken ?? profile.IdToken;
         if (existing is null) Add(profile, select);
         else
         {
@@ -263,37 +228,19 @@ public partial class ProfileService
 
     public static bool HasMicrosoftProfile => Profiles.Any(p => p.ProfileType == ProfileType.Microsoft);
 
-    private static async Task<IAuthenticateProvider> _CreateProviderAsync(ProfileType profileType,
-        AuthenticationRequest request, McProfile? existing, CancellationToken token)
+    private static IAuthenticateProvider _CreateProvider(ProfileType profileType)
     {
-        switch (profileType)
+        return profileType switch
         {
-            case ProfileType.Microsoft:
-                return new MicrosoftProvider();
-            case ProfileType.Authlib:
-                return new AuthlibProvider(request.Server ?? existing?.Server ??
-                    throw new InvalidOperationException("Authlib profile has no server."));
-            case ProfileType.YggdrasilConnect:
-            {
-                var provider = new YggdrasilConnectProvider(
-                    request.DiscoveryAddress ?? existing?.DiscoveryAddress ??
-                    throw new InvalidOperationException("Yggdrasil Connect profile has no discovery address."),
-                    request.ClientId,
-                    request.Server ?? existing?.Server);
-                await provider.InitializeAsync(token).ConfigureAwait(false);
-                return provider;
-            }
-            default:
-                throw new InvalidOperationException($"Profile type '{profileType}' does not require remote authentication.");
-        }
+            ProfileType.Microsoft => new MicrosoftProvider(),
+            _ => throw new InvalidOperationException($"Profile type '{profileType}' does not require remote authentication.")
+        };
     }
 
     private static McProfile? _FindMatchingProfile(AuthenticationResult result)
         => Profiles.FirstOrDefault(profile =>
             profile.ProfileType == result.ProfileType &&
-            string.Equals(profile.Uuid, result.Uuid, StringComparison.Ordinal) &&
-            (result.ProfileType == ProfileType.Microsoft ||
-             string.Equals(profile.Server, result.Server, StringComparison.OrdinalIgnoreCase)));
+            string.Equals(profile.Uuid, result.Uuid, StringComparison.Ordinal));
 
     private static void _EnsureLoaded()
     {
@@ -355,6 +302,8 @@ public partial class ProfileService
             foreach (var node in oldProfiles.OfType<JsonObject>())
             {
                 var type = node["type"]?.ToString()?.ToLowerInvariant();
+                // 仅迁移 Microsoft 档案；离线与第三方登录方式已移除，不再导入。
+                if (type != "microsoft") continue;
                 var profile = new McProfile
                 {
                     ProfileId = Guid.NewGuid().ToString("N"),
@@ -362,21 +311,12 @@ public partial class ProfileService
                     Uuid = node["uuid"]?.ToString() ?? string.Empty,
                     Description = node["desc"]?.ToString() ?? string.Empty,
                     SkinHeadId = node["skinHeadId"]?.ToString() ?? string.Empty,
-                    Server = node["server"]?.ToString(),
-                    ServerName = node["serverName"]?.ToString(),
-                    LoginName = _Decrypt(node["name"]?.ToString()),
-                    Password = _Decrypt(node["password"]?.ToString()),
                     ClientToken = _Decrypt(node["clientToken"]?.ToString()),
                     AccessToken = _Decrypt(node["accessToken"]?.ToString()),
                     RefreshToken = _Decrypt(node["refreshToken"]?.ToString()),
                     RawJson = _Decrypt(node["rawJson"]?.ToString()),
                     TokenType = "Bearer",
-                    ProfileType = type switch
-                    {
-                        "microsoft" => ProfileType.Microsoft,
-                        "authlib" => ProfileType.Authlib,
-                        _ => ProfileType.Offline
-                    }
+                    ProfileType = ProfileType.Microsoft
                 };
 
                 if (node["expires"]?.GetValue<long>() is { } expires && expires > 0)

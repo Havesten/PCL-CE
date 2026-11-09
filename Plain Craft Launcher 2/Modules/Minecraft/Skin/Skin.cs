@@ -96,9 +96,6 @@ public static class Skin
                 Lang.Text("Minecraft.Skin.Error.UuidEmpty"),
                 nameof(uuid));
 
-        if (uuid.StartsWith("00000"))
-            throw new InvalidOperationException(Lang.Text("Minecraft.Skin.Error.OfflineNoSkin"));
-
         var cachePath = Path.Combine(Common.pathTemp, $@"Cache\Skin\Index{type}.ini");
         var cacheSkinAddress = Common.ReadIni(cachePath, uuid);
         if (!string.IsNullOrEmpty(cacheSkinAddress))
@@ -108,8 +105,6 @@ public static class Skin
         {
             "Mojang" => "https://sessionserver.mojang.com/session/minecraft/profile/",
             "Ms" => "https://sessionserver.mojang.com/session/minecraft/profile/",
-            "Auth" => (ProfileService.Current?.Server ?? string.Empty).Replace("/authserver", "")
-                + "/sessionserver/session/minecraft/profile/",
             _ => throw new ArgumentException(
                 Lang.Text(
                     "Minecraft.Skin.Error.InvalidSkinType",

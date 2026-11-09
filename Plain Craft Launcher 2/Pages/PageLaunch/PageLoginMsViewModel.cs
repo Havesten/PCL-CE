@@ -46,7 +46,7 @@ public partial class PageLoginMsViewModel : ViewModelBase
             try
             {
                 ProfileService.Select(null);
-                GameLaunch.mcLoginMsLoader.Start(ProfileUi.GetLoginData(GameLaunch.McLoginType.Ms), true);
+                GameLaunch.mcLoginMsLoader.Start(ProfileUi.GetLoginData(), true);
                 while (GameLaunch.mcLoginMsLoader.State == Common.LoadState.Loading)
                 {
                     Common.RunInUi(() => LoginText = Lang.Number(GameLaunch.mcLoginMsLoader.Progress, "P0"));

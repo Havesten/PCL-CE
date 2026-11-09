@@ -134,7 +134,7 @@ public enum LifecycleState
     
     /// <summary>
     /// <b>加载结束</b><br/>
-    /// 非基本组件初始化，大多数功能性组件如 RPC 服务端、Yggdrasil 服务端的初始化等，均应在此时运行。<br/>
+    /// 非基本组件初始化，大多数功能性组件如 RPC 服务端的初始化等，均应在此时运行。<br/>
     /// 非异步启动将在 STA 线程执行，不建议在此状态非异步启动。
     /// </summary>
     Loaded,

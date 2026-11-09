@@ -20,10 +20,6 @@ public static partial class Libraries
 
         result.AddRange(McLibNetFilesFromTokens(McLibListGet(mcInstance, false)));
 
-        var authlibInjectorFile = _GetAuthlibInjectorFile();
-        if (authlibInjectorFile is not null)
-            result.Add(authlibInjectorFile);
-
         var mesaLoaderFile = _GetMesaLoaderFile();
         if (mesaLoaderFile is not null)
             result.Add(mesaLoaderFile);
@@ -49,63 +45,6 @@ public static partial class Libraries
         {
             Common.Log(ex, "实例缺失主 Jar 文件所必须的信息", Common.LogLevel.Developer);
         }
-    }
-
-    private static DownloadFile? _GetAuthlibInjectorFile()
-    {
-        var authlibTargetFile = Path.Combine(Common.pathPure, "authlib-injector.jar");
-        var authlibDownloadInfo = _FetchAuthlibInjectorInfo();
-        return authlibDownloadInfo is null
-            ? null
-            : _BuildAuthlibInjectorFile(authlibDownloadInfo, authlibTargetFile);
-    }
-
-    private static JsonObject? _FetchAuthlibInjectorInfo()
-    {
-        try
-        {
-            Common.Log("[Minecraft] 开始获取 Authlib-Injector 下载信息");
-            return (JsonObject)
-                Common.GetJson(
-                    NetFacade.NetGetCodeByLoader(
-                        [
-                            "https://authlib-injector.yushi.moe/artifact/latest.json",
-                            "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json"
-                        ],
-                        isJson: true));
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "获取 Authlib-Injector 下载信息失败");
-            return null;
-        }
-    }
-
-    private static DownloadFile? _BuildAuthlibInjectorFile(
-        JsonObject authlibDownloadInfo,
-        string authlibTargetFile)
-    {
-        var sha256 = authlibDownloadInfo["checksums"]?["sha256"]?.ToString() ?? "";
-        var checker = new Common.FileChecker(hash: sha256);
-        if (checker.Check(authlibTargetFile) is null)
-            return null;
-
-        var downloadAddress = (authlibDownloadInfo["download_url"]?.ToString() ?? "").Replace(
-            "bmclapi2.bangbang93.com/mirrors/authlib-injector",
-            "authlib-injector.yushi.moe");
-        Common.Log(
-            $"[Minecraft] Authlib-Injector 需要更新：{downloadAddress}",
-            Common.LogLevel.Developer);
-        return new DownloadFile(
-            [
-                downloadAddress,
-                downloadAddress.Replace(
-                    "authlib-injector.yushi.moe",
-                    "bmclapi2.bangbang93.com/mirrors/authlib-injector"
-                )
-            ],
-            authlibTargetFile,
-            new Common.FileChecker(hash: sha256));
     }
 
     private static DownloadFile? _GetMesaLoaderFile()

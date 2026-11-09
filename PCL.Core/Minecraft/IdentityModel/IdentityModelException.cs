@@ -14,7 +14,7 @@ public class IdentityModelConfigurationException(string message, Exception? inne
     : IdentityModelException(message, innerException);
 
 /// <summary>
-/// 认证服务器返回 OAuth/Yggdrasil 协议错误时抛出的异常。
+/// 认证服务器返回 OAuth 协议错误时抛出的异常。
 /// </summary>
 /// <param name="error">协议错误代码。</param>
 /// <param name="errorDescription">协议错误描述。</param>

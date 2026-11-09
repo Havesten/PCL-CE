@@ -35,8 +35,6 @@ public partial class PageInstanceSetup : IPageView
         SliderRamCustom.Change += SliderChange;
         SliderRamInitialCustom.Change += SliderChange;
 
-        ComboServerLoginRequire.SelectionChanged += ComboServerLogin_Changed;
-
         ComboAdvanceRenderer.SelectionChanged += ComboAdvanceRenderer_SelectionChanged;
 
         TextServerEnter.TextChanged += TextServerEnter_Change;
@@ -108,12 +106,6 @@ public partial class PageInstanceSetup : IPageView
 
             // 服务器
             _vm.ServerEnterText = Config.Instance.ServerToEnter[PageInstanceLeft.McInstance.PathInstance];
-            ComboServerLoginRequire.SelectedIndex = Config.InstanceAuth.LoginRequirementSolution[PageInstanceLeft.McInstance.PathInstance];
-            _comboServerLoginLast = ComboServerLoginRequire.SelectedIndex;
-            _vm.ServerAuthServerText = Config.InstanceAuth.AuthServerAddress[PageInstanceLeft.McInstance.PathInstance];
-            _vm.ServerAuthNameText = Config.InstanceAuth.AuthServerDisplayName[PageInstanceLeft.McInstance.PathInstance];
-            _vm.ServerAuthRegisterText = Config.InstanceAuth.AuthRegisterAddress[PageInstanceLeft.McInstance.PathInstance];
-            ServerLogin(ComboServerLoginRequire.SelectedIndex);
 
             // 高级设置
             ComboAdvanceRenderer.SelectedIndex = Config.Instance.Renderer[PageInstanceLeft.McInstance.PathInstance];
@@ -413,68 +405,6 @@ public partial class PageInstanceSetup : IPageView
     #endregion
 
     #region 服务器
-
-    // 全局
-    private int _comboServerLoginLast;
-
-    private void ComboServerLogin_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (Animations.AniExitsAnyControl() || ComboServerLoginRequire.SelectedIndex < 0)
-            return;
-        ServerLogin(ComboServerLoginRequire.SelectedIndex);
-        _vm.ServerAuthLockEnabled = TextServerAuthServer.IsValidated;
-        if ((ComboServerLoginRequire.SelectedIndex == 2 || ComboServerLoginRequire.SelectedIndex == 3) &&
-            !TextServerAuthServer.IsValidated)
-            return;
-        if (_comboServerLoginLast == ComboServerLoginRequire.SelectedIndex)
-            return;
-        _comboServerLoginLast = ComboServerLoginRequire.SelectedIndex;
-        Config.InstanceAuth.LoginRequirementSolution[PageInstanceLeft.McInstance.PathInstance] = ComboServerLoginRequire.SelectedIndex;
-    }
-
-    private void TextServerAuthServer_MouseLeave(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(_vm.ServerAuthServerText))
-            return;
-        if (!(_vm.ServerAuthServerText.EndsWithF("/api/yggdrasil/") ||
-              _vm.ServerAuthServerText.EndsWithF("/api/yggdrasil")))
-        {
-            if (_vm.ServerAuthServerText.EndsWithF("/"))
-            {
-                _vm.ServerAuthServerText = $"{_vm.ServerAuthServerText}api/yggdrasil";
-                HintService.Show(Hints.Info(Lang.Text("Instance.Setup.Server.AuthServer.AutoFormatted")));
-            }
-            else
-            {
-                _vm.ServerAuthServerText = $"{_vm.ServerAuthServerText}/api/yggdrasil";
-                HintService.Show(Hints.Info(Lang.Text("Instance.Setup.Server.AuthServer.AutoFormatted")));
-            }
-        }
-
-        if (_vm.ServerAuthServerText.EndsWithF("/api/yggdrasil/"))
-        {
-            _vm.ServerAuthServerText = _vm.ServerAuthServerText.BeforeLast("/");
-            HintService.Show(Hints.Info(Lang.Text("Instance.Setup.Server.AuthServer.AutoFormatted")));
-        }
-
-        _comboServerLoginLast = ComboServerLoginRequire.SelectedIndex;
-        ComboChange(ComboServerLoginRequire, null);
-    }
-
-    public void ServerLogin(int type)
-    {
-        _vm.RefreshServerLogin(type, TextServerAuthServer.Text);
-        CardServer.TriggerForceResize();
-    }
-
-    // LittleSkin
-    private void BtnServerAuthLittle_Click(object sender, MouseButtonEventArgs e) => _vm.ApplyLittleSkinCommand.Execute(null);
-
-    // 锁定设置
-    private void BtnServerAuthLock_Click(object sender, MouseButtonEventArgs e) => _vm.LockServerAuthCommand.Execute(null);
-
-    // 跳转新建档案
-    private void BtnServerNewProfile_Click(object sender, MouseButtonEventArgs e) => _vm.CreateServerProfileCommand.Execute(null);
 
     private void TextServerEnter_Change(object sender, TextChangedEventArgs e)
     {

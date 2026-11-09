@@ -54,11 +54,9 @@ public static partial class Launcher
     public static PageSetupFeedback? frmSetupFeedback;
     public static PageSetupLauncherLanguage? frmSetupLauncherLanguage;
     public static PageSetupLauncherMisc? frmSetupLauncherMisc;
-    public static PageLoginAuth? frmLoginAuth;
     public static PageLoginMs? frmLoginMs;
     public static PageLoginProfile? frmLoginProfile;
     public static PageLoginProfileSkin? frmLoginProfileSkin;
-    public static PageLoginOffline? frmLoginOffline;
     public static PageInstanceLeft? frmInstanceLeft;
     public static PageInstanceOverall? frmInstanceOverall;
     public static PageInstanceCompResource? frmInstanceMod;

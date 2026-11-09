@@ -14,7 +14,6 @@ public enum DialogKind
     Markdown,
     Input,
     Select,
-    AuthServer,
     Login
 }
 
@@ -85,15 +84,6 @@ public sealed record SelectDialogRequest : DialogRequest
     public bool MultiSelect { get; init; }
 
     public override DialogKind Kind => DialogKind.Select;
-}
-
-public sealed record AuthServerDialogRequest : DialogRequest
-{
-    public required string DefaultServer { get; init; }
-
-    public required IReadOnlyDictionary<string, string> Presets { get; init; }
-
-    public override DialogKind Kind => DialogKind.AuthServer;
 }
 
 public sealed record LoginDialogRequest : DialogRequest

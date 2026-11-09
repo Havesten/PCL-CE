@@ -102,11 +102,6 @@ public sealed partial class DialogViewModel : ObservableObject
     public IReadOnlyList<IValidator<string>> ValidateRules =>
         (Request as InputDialogRequest)?.ValidateRules ?? [];
 
-    public string DefaultServer => (Request as AuthServerDialogRequest)?.DefaultServer ?? "";
-
-    public IReadOnlyDictionary<string, string> Presets =>
-        (Request as AuthServerDialogRequest)?.Presets ?? new Dictionary<string, string>();
-
     public JsonObject? LoginData => (Request as LoginDialogRequest)?.Data;
 
     public Func<JsonObject, CancellationToken, Task<AuthorizeResult?>>? DeviceCodePoll =>
@@ -161,7 +156,6 @@ public sealed partial class DialogViewModel : ObservableObject
                 => new DialogResult(button, SelectedIndices: GetCheckedIndices()),
             SelectDialogRequest when button == 1
                 => new DialogResult(button, SelectedIndex: SelectedIndex),
-            AuthServerDialogRequest when button == 1 => new DialogResult(button, InputText),
             LoginDialogRequest => new DialogResult(button),
             _ => new DialogResult(button)
         };

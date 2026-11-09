@@ -15,19 +15,8 @@ public sealed class McProfile : SafeProfile
     [JsonPropertyName("skinHeadId")] public string SkinHeadId { get; set; } = string.Empty;
     [JsonPropertyName("rawJson")] public string RawJson { get; set; } = string.Empty;
 
-    // Authlib/Yggdrasil
-    [JsonPropertyName("server")] public string? Server { get; set; }
-    [JsonPropertyName("serverName")] public string? ServerName { get; set; }
-    [JsonPropertyName("name")] public string? LoginName { get; set; }
-    [JsonPropertyName("password")] public string? Password { get; set; }
-
-    // OAuth/OpenID provider metadata
     [JsonPropertyName("provider")]
     public string? Provider { get; set; }
-    [JsonPropertyName("discoveryAddress")]
-    public string? DiscoveryAddress { get; set; }
-    [JsonPropertyName("idToken")]
-    public string? IdToken { get; set; }
 
     [JsonIgnore]
     public bool IsExpired => ExpiresAt is { } expires && expires <= DateTimeOffset.UtcNow.AddMinutes(1);
@@ -46,12 +35,6 @@ public sealed class McProfile : SafeProfile
         Description = Description,
         SkinHeadId = SkinHeadId,
         RawJson = RawJson,
-        Server = Server,
-        ServerName = ServerName,
-        LoginName = LoginName,
-        Password = Password,
-        Provider = Provider,
-        DiscoveryAddress = DiscoveryAddress,
-        IdToken = IdToken
+        Provider = Provider
     };
 }

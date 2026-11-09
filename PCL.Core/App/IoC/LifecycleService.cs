@@ -334,7 +334,7 @@ partial class Lifecycle
 public interface ILifecycleService
 {
     /// <summary>
-    /// 全局唯一标识符，统一使用纯小写字母与 “-” 的命名格式，如 <c>logger</c> <c>yggdrasil-server</c> 等。
+    /// 全局唯一标识符，统一使用纯小写字母与 “-” 的命名格式，如 <c>logger</c> <c>profile</c> 等。
     /// </summary>
     public string Identifier { get; }
     

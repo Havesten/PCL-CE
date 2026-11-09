@@ -182,14 +182,7 @@ public static partial class Launcher
 
         text = text.Replace("{user}", replacer(loginLoader.output.Name));
         text = text.Replace("{uuid}", replacer(loginLoader.output.Uuid.ToLower()));
-
-        text = loginLoader.input?.LoginType switch
-        {
-            GameLaunch.McLoginType.Legacy => text.Replace("{login}", replacer("离线")),
-            GameLaunch.McLoginType.Ms => text.Replace("{login}", replacer("正版")),
-            GameLaunch.McLoginType.Auth => text.Replace("{login}", replacer("Authlib-Injector")),
-            _ => throw new ArgumentOutOfRangeException()
-        };
+        text = text.Replace("{login}", replacer("正版"));
 
         return text;
     }

@@ -10,13 +10,6 @@ namespace PCL;
 
 public static partial class GameLaunch
 {
-    public enum McLoginType
-    {
-        Legacy = 1,
-        Auth = 2,
-        Ms = 3
-    }
-
     public static Loading.LoaderTask<McLoginData, McLoginResult> mcLoginLoader =
         new(
             Lang.Text("Minecraft.Launch.Stage.Login"),
@@ -35,15 +28,6 @@ public static partial class GameLaunch
         new("Loader Login Ms", McLoginMsStart)
         {
             reloadTimeout = 1
-        };
-
-    public static Loading.LoaderTask<McLoginLegacy, McLoginResult> mcLoginLegacyLoader =
-        new("Loader Login Legacy", McLoginLegacyStart);
-
-    public static Loading.LoaderTask<McLoginServer, McLoginResult> mcLoginAuthLoader =
-        new("Loader Login Auth", McLoginServerStartNew)
-        {
-            reloadTimeout = 1000 * 60 * 10
         };
 
     public static McLoginData? McLoginInput()
@@ -72,26 +56,8 @@ public static partial class GameLaunch
         if (!string.IsNullOrEmpty(checkResult))
             throw new ArgumentException(checkResult);
 
-        switch (data.input!.LoginType)
-        {
-            case McLoginType.Ms:
-                mcLoginMsLoader.WaitForExit(data.input, mcLoginLoader, data.isForceRestarting);
-                data.output = mcLoginMsLoader.output;
-                break;
-
-            case McLoginType.Legacy:
-                mcLoginLegacyLoader.WaitForExit(data.input, mcLoginLoader, data.isForceRestarting);
-                data.output = mcLoginLegacyLoader.output;
-                break;
-
-            case McLoginType.Auth:
-                mcLoginAuthLoader.WaitForExit(data.input, mcLoginLoader, data.isForceRestarting);
-                data.output = mcLoginAuthLoader.output;
-                break;
-
-            default:
-                throw new Exception("未知的登录方式");
-        }
+        mcLoginMsLoader.WaitForExit((McLoginMs)data.input!, mcLoginLoader, data.isForceRestarting);
+        data.output = mcLoginMsLoader.output;
 
         Common.RunInUi(() => Launcher.frmLaunchLeft!.RefreshPage(false));
         Common.Log("[Profile] 选定档案加载完成");
@@ -195,218 +161,19 @@ public static partial class GameLaunch
         return Task.FromResult(reuseCachedProfile);
     }
 
-    private static void McLoginServerStartNew(Loading.LoaderTask<McLoginServer, McLoginResult> data)
-    {
-        var input = data.input!;
-        LogWrapper.Info("Profile", $"验证方式：{input.Description}");
-        data.Progress = 0.1d;
-        var existing =
-            input.IsExist && !ProfileService.IsCreatingProfile ? ProfileService.Current : null;
-        var stored = ProfileService
-            .AuthenticateAsync(
-                input.ProviderType,
-                _CreateServerAuthenticationRequest(input, data),
-                existing,
-                true,
-                data.AbortedToken)
-            .GetAwaiter()
-            .GetResult();
-        if (data.IsAborted)
-            throw new ThreadInterruptedException();
-
-        data.output = _CreateAuthLoginResult(stored);
-        ProfileService.IsCreatingProfile = false;
-        data.Progress = 0.98d;
-        LogWrapper.Info("Profile", "第三方验证完成");
-    }
-
-    private static AuthenticationRequest _CreateServerAuthenticationRequest(
-        McLoginServer input,
-        Loading.LoaderTask<McLoginServer, McLoginResult> data)
-    {
-        return new AuthenticationRequest
-        {
-            Server = input.BaseUrl,
-            DiscoveryAddress = input.DiscoveryAddress,
-            Username = input.UserName,
-            Password = input.Password,
-            ForceRefresh = data.isForceRestarting,
-            ForceReselectProfile = input.ForceReselectProfile,
-            DeviceCodeHandler =
-                input.ProviderType == ProfileType.YggdrasilConnect
-                    ? ProfileUi.ShowDeviceCodeLoginAsync
-                    : null,
-            ProfileSelector = (candidates, _) => Task.FromResult(_SelectAuthProfile(candidates))
-        };
-    }
-
-    private static McLoginResult _CreateAuthLoginResult(McProfile stored)
-    {
-        return new McLoginResult
-        {
-            AccessToken = stored.AccessToken,
-            ClientToken = stored.ClientToken,
-            Uuid = stored.Uuid,
-            Name = stored.UserName,
-            Type = "Auth"
-        };
-    }
-
-    private static AuthenticationCandidate? _SelectAuthProfile(
-        IReadOnlyList<AuthenticationCandidate> candidates)
-    {
-        switch (candidates.Count)
-        {
-            case 0:
-                return null;
-            case 1:
-                return candidates[0];
-        }
-
-        AuthenticationCandidate? selected = null;
-        Common.RunInUiWait(() =>
-        {
-            var controls = candidates
-                .Select(IMyRadio (item) => new MyRadioBox
-                {
-                    Text = item.Name
-                })
-                .ToList();
-            var index = DialogService.Instance.Show(new SelectDialogRequest
-            {
-                Title = Lang.Text("Minecraft.Launch.Login.Auth.SelectProfile"),
-                Options = PCL.DialogOptions.From(controls),
-                Buttons = DialogButtons.Ok,
-                HighLight = false,
-                ForceWait = true
-            }).Result?.SelectedIndex;
-            if (index is >= 0 and < 100000)
-                selected = candidates[index.Value];
-        });
-        return selected;
-    }
-
-    private static void McLoginLegacyStart(Loading.LoaderTask<McLoginLegacy, McLoginResult> data)
-    {
-        var input = data.input!;
-        LogWrapper.Info("Profile", $"验证方式：离线（{input.UserName}, {input.Uuid}）");
-        data.Progress = 0.1d;
-        data.output.Name = input.UserName ?? "";
-        data.output.Uuid = input.Uuid ?? "";
-        data.output.Type = "Legacy";
-        data.output.AccessToken = data.output.Uuid;
-        data.output.ClientToken = data.output.Uuid;
-    }
-
     public abstract class McLoginData
     {
-        /// <summary>
-        ///     登录方式。
-        /// </summary>
-        public McLoginType LoginType;
-
         public override bool Equals(object? obj)
         {
             return obj is not null && obj.GetHashCode() == GetHashCode();
         }
     }
 
-    public class McLoginServer : McLoginData
-    {
-        /// <summary>
-        ///     登录服务器基础地址。
-        /// </summary>
-        public string? BaseUrl;
-
-        /// <summary>
-        ///     登录方式的描述字符串，如 “正版”、“统一通行证”。
-        /// </summary>
-        public string? Description;
-
-        public string? DiscoveryAddress;
-
-        /// <summary>
-        ///     是否在本次登录中强制要求玩家重新选择角色，目前仅对 Authlib-Injector 生效。
-        /// </summary>
-        public bool ForceReselectProfile = false;
-
-        /// <summary>
-        ///     是否已经存在该验证信息，用于判断是否为新增档案。
-        /// </summary>
-        public bool IsExist = false;
-
-        /// <summary>
-        ///     登录密码。
-        /// </summary>
-        public string? Password;
-
-        public ProfileType ProviderType = ProfileType.Authlib;
-
-        /// <summary>
-        ///     登录用户名。
-        /// </summary>
-        public string? UserName;
-
-        public McLoginServer(McLoginType type)
-        {
-            LoginType = type;
-        }
-
-        public override int GetHashCode()
-        {
-            return (int)
-                Math.Round(
-                    Common.GetHash(UserName + Password + BaseUrl + (int)LoginType)
-                    % (decimal)int.MaxValue);
-        }
-    }
-
     public class McLoginMs : McLoginData
     {
-        public McLoginMs()
-        {
-            LoginType = McLoginType.Ms;
-        }
-
         public override int GetHashCode()
         {
-            return (int)Math.Round(Common.GetHash(LoginType.ToString()) % (decimal)int.MaxValue);
-        }
-    }
-
-    public class McLoginLegacy : McLoginData
-    {
-        /// <summary>
-        ///     若采用正版皮肤，则为该皮肤名。
-        /// </summary>
-        public string? SkinName;
-
-        /// <summary>
-        ///     皮肤种类。
-        /// </summary>
-        public int SkinType;
-
-        /// <summary>
-        ///     登录用户名。
-        /// </summary>
-        public string? UserName;
-
-        /// <summary>
-        ///     UUID。
-        /// </summary>
-        public string? Uuid;
-
-        public McLoginLegacy()
-        {
-            LoginType = McLoginType.Legacy;
-        }
-
-        public override int GetHashCode()
-        {
-            return (int)
-                Math.Round(
-                    Common.GetHash(UserName + SkinType + SkinName + (int)LoginType)
-                    % (decimal)int.MaxValue);
+            return (int)Math.Round(Common.GetHash(nameof(McLoginMs)) % (decimal)int.MaxValue);
         }
     }
 

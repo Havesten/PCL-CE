@@ -57,7 +57,7 @@ The old Lobby entry and the Natayark account login it depended on are gone — m
 
 ### Changed: accounts
 
-- Creating a profile now only offers "Microsoft account"; **both the offline and third-party auth entries are hidden**. Existing offline and third-party profiles are unaffected and still launch and refresh fine
+- **Microsoft account sign-in only.** Offline login and third-party auth (Authlib-Injector / Yggdrasil-based) have been removed from the code entirely — login pages, injector download and injection, and the per-instance auth-server settings are all gone. Legacy offline / third-party profiles fall back to Microsoft profiles when loaded and must sign in with a Microsoft account before they can launch
 
 ### Changed: interface
 
@@ -100,7 +100,7 @@ A self-built copy ships with **no embedded keys**. Nothing breaks, but two featu
 | Variable | Behaviour when missing |
 |---|---|
 | `PCL_CURSEFORGE_API_KEY` | CurseForge's official API returns 403 and falls back to the mcim mirror (download source must be set to Auto or Prefer mirror) |
-| `PCL_MS_CLIENT_ID` | Microsoft sign-in unavailable, offline login only |
+| `PCL_MS_CLIENT_ID` | Microsoft sign-in unavailable (it is the only sign-in method, so the launcher cannot log in) |
 | `PCL_NAID_CLIENT_ID` / `_SECRET` | Natayark ID login unavailable (the Lobby is gone, so this is usually no longer needed) |
 
 ```bash

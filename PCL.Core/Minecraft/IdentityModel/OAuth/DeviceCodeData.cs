@@ -8,7 +8,7 @@ public record DeviceCodeData
     public bool IsError => !Error.IsNullOrEmpty();
 
     /// <summary>
-    /// 按 Yggdrasil Connect / RFC 8628 规范校验设备授权响应的必须字段。
+    /// 按 RFC 8628 规范校验设备授权响应的必须字段。
     /// 错误响应（error 存在时）不在此校验，交由调用方按错误处理。
     /// </summary>
     /// <exception cref="IdentityModelAuthenticationException">缺少协议规定的必须字段</exception>

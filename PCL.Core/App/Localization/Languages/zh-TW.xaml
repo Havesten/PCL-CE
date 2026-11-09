@@ -967,7 +967,6 @@
     <sys:String x:Key="Instance.Overall.Reset.NotSupported">該實例暫不支援重設！</sys:String>
     <sys:String x:Key="Instance.Overall.Reset.QuiltUnsupported">無法重設：目前啟動器已不再支援 Quilt 載入器。</sys:String>
     <sys:String x:Key="Instance.Overall.Script.ExportFailed">匯出啟動指令碼失敗</sys:String>
-    <sys:String x:Key="Instance.Overall.Script.Exporting">正在匯出啟動指令碼……</sys:String>
     <sys:String x:Key="Instance.Overall.Script.ExportingWarning">正在匯出啟動指令碼……（注意，使用指令碼啟動可能會導致登入失效！）</sys:String>
     <sys:String x:Key="Instance.Overall.Script.FileFilter">批次檔(*.bat)|*.bat</sys:String>
     <sys:String x:Key="Instance.Overall.Script.SelectSaveTitle">選擇指令碼儲存位置</sys:String>
@@ -1396,7 +1395,7 @@
     <sys:String x:Key="Instance.Setup.Advanced.Classpath">Classpath 頭部附加</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.Classpath.ToolTip">文字方塊中的內容將被作為 Classpath 新增到該實例的啟動參數中的 Classpath 頭部。&#xA;需要使用絕對路徑。若有多個，請以半形（英文）分號分隔。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification">關閉檔案校驗</sys:String>
-    <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification.ToolTip">完全不更改 Assets；不校驗 Libraries、第三方登入庫與實例主 Jar 檔案是否被修改。&#xA;如果你沒有修改相關檔案，請勿勾選此項。</sys:String>
+    <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification.ToolTip">完全不更改 Assets；不校驗 Libraries 與實例主 Jar 檔案是否被修改。&#xA;如果你沒有修改相關檔案，請勿勾選此項。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.GameArgs.ToolTip">文字方塊中的內容將會被直接拼合在啟動參數的末尾。&#xA;例如，輸入 --demo 則會以試玩模式啟動遊戲。&#xA;支援 Minecraft 實例 JSON 中的字串取代標記，例如 ${library_directory}。&#xA;&#xA;若留空，則跟隨全域設定的值。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility">忽略 Java 相容性警告</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility.ToolTip">如果手動選擇了與目前實例不相容的 Java，則自動跳過相容性警告對話方塊，強制使用手動選擇的 Java。</sys:String>
@@ -1439,32 +1438,8 @@
 
     <!-- Instance.Setup.Server -->
 
-    <sys:String x:Key="Instance.Setup.Server.AuthServer">目標驗證伺服器</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.AuthServer.AutoFormatted">已自動格式化驗證伺服器位址！</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.AuthServer.Hint">Yggdrasil API 認證伺服器的完整網址</sys:String>
     <sys:String x:Key="Instance.Setup.Server.AutoJoin">自動進入伺服器</sys:String>
     <sys:String x:Key="Instance.Setup.Server.AutoJoin.ToolTip">在開啟 Minecraft 後自動進入某伺服器。&#xA;用英文冒號間隔 IP 與通訊埠，例如「87.87.87.87:12345」。</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.CreateProfile">建立檔案</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.HttpWarning">使用 HTTP 協議進行登入操作可能面臨登入密碼在未加密的情況下被明文傳輸的安全風險。&#xA;如果沒有特殊需求，請始終考慮使用 HTTPS 協議！</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Name">LittleSkin 登入</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Continue">繼續</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Message">即將把第三方登入設定覆蓋為 LittleSkin 登入。&#xA;除非你是服主，或服主要求你這樣做，否則請勿繼續。&#xA;&#xA;是否確實需要覆蓋目前設定？</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Title">設定覆蓋確認</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod">鎖定驗證方式</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod.Message">你正在選擇鎖定此實例的驗證方式。鎖定後，將無法再更改此實例的驗證方式要求，啟動此實例將必須使用指定的驗證方式。&#xA;此功能可能會幫助一些服主吧。&#xA;是否繼續？</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod.Title">鎖定驗證方式確認</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginLockHint">目前實例的驗證方式已鎖定，無法再次更改。請使用要求的驗證方式啟動遊戲。</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.AuthOnly">僅第三方驗證（Authlib-Injector）</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.MicrosoftOnly">僅微軟驗證</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.MicrosoftOrAuth">微軟驗證與第三方驗證（Authlib-Injector）</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.Unlimited">無限制</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Name">伺服器名稱</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Name.Hint">顯示在登入畫面的伺服器名稱</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Register">註冊連結</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Register.Hint">註冊帳戶的網頁位址，如 https://xxxxx.xxx/auth/register</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.RestrictLogin">限制驗證方式</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.SetLittleSkin">設定為 LittleSkin</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.SslWarning">未啟用 SSL 證書驗證可能導致登入密碼面臨被第三方截獲的安全風險。&#xA;如果沒有特殊需求，請始終考慮啟用 SSL 證書驗證！</sys:String>
     <sys:String x:Key="Instance.Setup.Server.Title">伺服器</sys:String>
 
     <!-- Launch -->
@@ -1481,8 +1456,6 @@
     <sys:String x:Key="Launch.Account.Login">登入</sys:String>
     <sys:String x:Key="Launch.Account.LoginCancelled">已取消登入！</sys:String>
     <sys:String x:Key="Launch.Account.Type.Microsoft">微軟驗證</sys:String>
-    <sys:String x:Key="Launch.Account.Type.Offline">離線驗證</sys:String>
-    <sys:String x:Key="Launch.Account.Type.ThirdParty">第三方驗證</sys:String>
 
     <!-- Launch.Account.Auth -->
 
@@ -1494,14 +1467,11 @@
     <sys:String x:Key="Launch.Account.Auth.ForgotPassword">找回密碼</sys:String>
     <sys:String x:Key="Launch.Account.Auth.InvalidServer">輸入的驗證伺服器位址無效</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Login">登入</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.LoginFailed">第三方登入嘗試失敗</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.LoginFailed.WithDetail">第三方登入嘗試失敗。&#xA;&#xA;原始錯誤資訊：&#xA;{0}</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Logout">退出登入</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Password">密碼</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Preset.LittleSkin">預設 - LittleSkin</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Register">註冊帳戶</sys:String>
     <sys:String x:Key="Launch.Account.Auth.ServerLabel">驗證伺服器: {0}</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.SelectServer">選擇驗證伺服器</sys:String>
     <sys:String x:Key="Launch.Account.Auth.OAuthLogin">開始 OAuth 登入</sys:String>
     <sys:String x:Key="Launch.Account.Auth.UsePassword">»   使用密碼登入</sys:String>
     <sys:String x:Key="Launch.Account.Auth.UseOAuth">»   使用 OAuth 登入</sys:String>
@@ -1530,30 +1500,12 @@
     <sys:String x:Key="Launch.Account.Microsoft.Start">開始微軟驗證</sys:String>
     <sys:String x:Key="Launch.Account.Microsoft.Website">»   前往官網</sys:String>
 
-    <!-- Launch.Account.Offline -->
 
-    <sys:String x:Key="Launch.Account.Offline.Back">返回</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Create">建立</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidPlayerId.Message">你輸入的玩家 ID 不符合標準（3 - 16 位，只可以包含英文字母、數字與下劃線），可能導致部分版本的遊戲無法啟動或發生錯誤。&#xA;強烈建議使用規範的玩家 ID！&#xA;如果你堅持，仍然可以繼續建立檔案。</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidPlayerId.Title">玩家 ID 不符合規範</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidUuid">UUID 不符合要求：{0}</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.PlayerId">玩家 ID</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.PlayerId.ToolTip">3 - 16 位，只可以包含英文字母、數字與下劃線</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Custom.Input.ToolTip">應為 32 個十六進位字元，且不含連字號</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Custom.ToolTip">適用於高階使用者，如果你不知道這是什麼，請不要選擇此項</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Legacy">舊版</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Legacy.ToolTip">使用舊版 PCLCE-NS 的 UUID 生成規則&#xA;若從舊版 PCLCE-NS 升級，且單人存檔的部分資訊遺失，可嘗試此項</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Standard">行業規範</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Standard.ToolTip">[推薦] 生成的 UUID 與 HMCL、BakaXL 和 Bukkit 等其他軟體一致</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.UuidStandard">UUID 標準</sys:String>
 
     <!-- Launch.Account.Profile -->
 
-    <sys:String x:Key="Launch.Account.Profile.ChangeAuthServerName">更改驗證伺服器名稱</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.ChangeUuid">更改 UUID</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CopyUuid">複製 UUID</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Create">建立檔案</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Create.SelectAuthType.Title">建立檔案 - 選擇驗證型別</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CreateAndSelectHint">建立並選擇一個檔案以啟動遊戲</sys:String>
     <sys:String x:Key="Launch.Account.Profile.RequireMicrosoftHint">需要先進行一次微軟驗證才能使用其他驗證方式</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Created">檔案建立成功！</sys:String>
@@ -1561,8 +1513,6 @@
     <sys:String x:Key="Launch.Account.Profile.DeleteConfirm.Message">你正在選擇刪除此檔案，該操作無法復原。&#xA;確定繼續？</sys:String>
     <sys:String x:Key="Launch.Account.Profile.DeleteConfirm.Title">刪除檔案確認</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Deleted">檔案刪除成功！</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.EditServerName.Message">請輸入新的驗證伺服器名稱</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.EditServerName.Title">修改驗證伺服器名稱</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.ChangeId">修改檔案 ID 失敗</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.ChangeSkin">更改外觀失敗</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.Corrupted">讀取檔案資料失敗，資料檔案可能意外損壞。已備份並重設檔案資料。</sys:String>
@@ -1571,16 +1521,7 @@
     <sys:String x:Key="Launch.Account.Profile.ImportExport">匯入 / 匯出</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Saved">檔案資訊已儲存！</sys:String>
     <sys:String x:Key="Launch.Account.Profile.SelectHint">選擇一個檔案以啟動遊戲</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.ChangeTitle">更改檔案 {0} 的 UUID</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Hint">32 個字元，不含連字號</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.InvalidChars">UUID 只能包含英文字母與數字！</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Legacy">原版 PCL UUID（若單人存檔的部分資訊遺失，可嘗試此項）</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.SelectType.Title">建立檔案 - 選擇 UUID 型別</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Standard">行業規範 UUID（推薦）</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.EmptyUsername">玩家名不能為空！</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.QuoteInUsername">玩家名不能包含英文引號！</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Validation.UnknownAuthType">未知的驗證方式</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.UsernameTooLong">自 1.20.3 起，玩家名至多只能包含 16 個字元！</sys:String>
 
     <!-- Launch.Account.Profile.EditPlayerId -->
 
@@ -1598,16 +1539,13 @@
 
     <!-- Launch.Account.ProfileSkin -->
 
-    <sys:String x:Key="Launch.Account.ProfileSkin.CapeUnsupported">目前檔案不支援修改披風！</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.ChangeCape">修改披風</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.ChangeSkin">修改外觀</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditPassword">修改密碼</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditProfile">修改資訊</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditUsername">修改玩家名</sys:String>
-    <sys:String x:Key="Launch.Account.ProfileSkin.PasswordUnsupported">目前檔案不支援修改密碼！</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.RefreshSkin">重新整理大頭貼</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SaveSkin">儲存外觀</sys:String>
-    <sys:String x:Key="Launch.Account.ProfileSkin.SkinUnsupported">目前檔案不支援修改外觀！</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SkinsAndCapes">外觀與披風</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SwitchProfile">選擇檔案</sys:String>
 
@@ -1642,8 +1580,6 @@
 
     <sys:String x:Key="Launch.Skin.ChangeCape">更換披風</sys:String>
     <sys:String x:Key="Launch.Skin.ChangeSuccess">更改外觀成功！</sys:String>
-    <sys:String x:Key="Launch.Skin.Error.AuthGet">取得 Authlib-Injector 外觀失敗（{0}）</sys:String>
-    <sys:String x:Key="Launch.Skin.Error.AuthlibRateLimited">取得 Authlib-Injector 外觀失敗。請求過於頻繁，請 5 分鐘後再試。</sys:String>
     <sys:String x:Key="Launch.Skin.Error.MsGet">取得微軟外觀失敗（{0}）</sys:String>
     <sys:String x:Key="Launch.Skin.Error.MsRateLimited">取得外觀太過頻繁，請 5 分鐘後再試（{0}）</sys:String>
     <sys:String x:Key="Launch.Skin.Fetching">外觀正在取得中，請稍候！</sys:String>
@@ -1885,9 +1821,6 @@
 
     <!-- Main.FileDrag -->
 
-    <sys:String x:Key="Main.FileDrag.AuthlibInvalid">輸入的 Authlib 驗證伺服器不符合網址格式 ({0})！</sys:String>
-    <sys:String x:Key="Main.FileDrag.CreateAuthlibProfile">是否要建立新的第三方驗證檔案？&#xA;驗證伺服器位址：{0}</sys:String>
-    <sys:String x:Key="Main.FileDrag.CreateAuthlibProfileTitle">建立新的第三方驗證檔案</sys:String>
     <sys:String x:Key="Main.FileDrag.ExtractFirst">請將檔案解壓縮後再拖入！</sys:String>
     <sys:String x:Key="Main.FileDrag.FileNotFound">拖入的檔案不存在：{0}</sys:String>
     <sys:String x:Key="Main.FileDrag.FileOnly">請拖入一個檔案，而非資料夾！</sys:String>
@@ -1910,7 +1843,6 @@
     <sys:String x:Key="Minecraft.Skin.Error.InvalidSkinType">外觀位址種類無效：{0}</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.NoCustomSkin">使用者未設定自訂外觀</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.NoSkinData">外觀返回值中不包含外觀資料項，可能是未設定自訂外觀的使用者</sys:String>
-    <sys:String x:Key="Minecraft.Skin.Error.OfflineNoSkin">離線 UUID 無外觀檔案。</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.PropertyNotFound">未從外觀回傳值中找到符合條件的 Property</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.SkinReturnEmpty">外觀回傳值為空，可能是未設定自訂外觀的使用者</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.UuidEmpty">UUID 為空。</sys:String>
@@ -2164,8 +2096,6 @@
 
     <sys:String x:Key="Minecraft.Launch.Error.AlreadyLaunching">已有遊戲正在啟動中！</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CancelProcess">取消啟動結束程式失敗</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Error.CannotConnectAuthServer">無法連線到第三方登入伺服器（{0}）</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Error.CannotConnectAuthServerWithDetail">無法連線到第三方登入伺服器（{0}）&#xA;詳細資訊：</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CannotLaunch">無法啟動 Minecraft：{0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CustomCommand">執行自訂指令失敗</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.DispatcherUnavailable">啟動器介面不可用，無法執行此操作。</sys:String>
@@ -2223,26 +2153,7 @@
     <sys:String x:Key="Minecraft.Launch.Login.RefreshAccountFailed.Title">帳戶資訊取得失敗</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Register">註冊</sys:String>
 
-    <!-- Minecraft.Launch.Login.Auth -->
 
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.DetailPrefix">詳細資訊：</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.FailedTitle">第三方驗證失敗</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.InvalidProfile">選擇的角色 {0} 無效！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.LoginFailed">登入失敗：{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.LoginFailed.WithDetail">第三方驗證登入失敗。&#xA;&#xA;詳細資訊：&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NetworkFailed.Message">第三方驗證登入失敗，請檢查你的網路狀況是否良好。</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NetworkFailed.WithDetail">第三方驗證登入失敗，請檢查網路連線。&#xA;&#xA;詳細資訊：&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NoProfile">$你還沒有建立角色，請在建立角色後再試！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NoProfileCannotSwitch">你還沒有建立角色，無法更換！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.OnlyOneProfile">你的帳戶中只有一個角色，無法更換！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.RefreshFailed">重新整理登入失敗</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.RefreshFailed.WithDetail">重新整理登入失敗。&#xA;&#xA;詳細資訊：&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.SecondRefreshFailed">二輪重新整理登入失敗</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.SelectProfile">選擇使用的角色</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.DetailMessage">$登入失敗：連線登入伺服器超時。&#xA;請檢查你的網路狀況是否良好，或嘗試使用 VPN！&#xA;詳細資訊：</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.Message">登入失敗：連線登入伺服器超時。&#xA;請檢查你的網路狀況是否良好，或嘗試使用 VPN！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.WithDetail">登入失敗：連線登入伺服器超時。&#xA;請檢查網路連線，或嘗試使用 VPN。&#xA;&#xA;詳細資訊：&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.ValidationFailed.WithDetail">驗證登入失敗。&#xA;&#xA;詳細資訊：&#xA;{0}</sys:String>
 
     <!-- Minecraft.Launch.Login.Microsoft -->
 
@@ -2264,7 +2175,6 @@
 
     <!-- Minecraft.Launch.Precheck -->
 
-    <sys:String x:Key="Minecraft.Launch.Precheck.AuthServerMismatch">目前檔案使用的第三方驗證伺服器與實例要求使用的不一致，請使用符合要求的檔案啟動遊戲！</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.Failed.WithDetail">啟動前檢查失敗：{0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.InstanceError">Minecraft 存在問題：{0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.InvalidPathChars">遊戲路徑中不可包含「!」或「;」（{0}）</sys:String>
@@ -2275,8 +2185,6 @@
     <sys:String x:Key="Minecraft.Launch.Precheck.NonAsciiPath.Message">欲啟動實例 "{0}" 的路徑中存在可能影響遊戲正常執行的字元（非 ASCII 字元），是否仍舊啟動遊戲？&#xA;&#xA;如果不清楚具體作用，你可以先選擇 "繼續"，發現遊戲在啟動後很快出現崩潰的情況後再嘗試修改遊戲路徑等操作</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.NonAsciiPath.Title">遊戲路徑檢查</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.RequireMicrosoft">目前實例要求使用微軟驗證，請使用微軟驗證檔案啟動遊戲！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Precheck.RequireMicrosoftOrThirdParty">目前實例要求使用微軟驗證或第三方驗證，請使用符合要求的檔案啟動遊戲！</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Precheck.RequireThirdParty">目前實例要求使用第三方驗證，請使用第三方驗證檔案啟動遊戲！</sys:String>
 
     <!-- Minecraft.Launch.Stage -->
 
@@ -2330,7 +2238,7 @@
     <sys:String x:Key="Select.Folder.CannotAddWhileDownloading">在下載工作進行時，無法新增遊戲資料夾！</sys:String>
     <sys:String x:Key="Select.Folder.CannotCreateWhileDownloading">在下載工作進行時，無法建立遊戲資料夾！</sys:String>
     <sys:String x:Key="Select.Folder.Cleanup.Keep">保留</sys:String>
-    <sys:String x:Key="Select.Folder.Cleanup.Message">是否需要清理 PCLCE-NS 在該資料夾中的設定檔？&#xA;這包括各個實例的獨立設定（如自訂圖示、第三方登入設定）等，對遊戲本身沒有影響。</sys:String>
+    <sys:String x:Key="Select.Folder.Cleanup.Message">是否需要清理 PCLCE-NS 在該資料夾中的設定檔？&#xA;這包括各個實例的獨立設定（如自訂圖示）等，對遊戲本身沒有影響。</sys:String>
     <sys:String x:Key="Select.Folder.Cleanup.Title">設定檔清理</sys:String>
     <sys:String x:Key="Select.Folder.Clear">清空</sys:String>
     <sys:String x:Key="Select.Folder.Clear.Confirm">確認清空</sys:String>

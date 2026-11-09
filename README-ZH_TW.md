@@ -57,7 +57,7 @@ Cloudflare 站點會額外改用通用優選 IP 池（`cloudflare.182682.xyz` �
 
 ### 變更：帳號
 
-- 新建檔案僅提供「微軟帳號」，**離線與第三方驗證入口均已隱藏**。已存在的離線與第三方檔案不受影響，仍可正常啟動與續期
+- **僅支援微軟帳號登入**：離線登入與第三方驗證（Authlib-Injector / Yggdrasil 系）的程式碼已徹底移除，包含登入頁、注入器下載與注入、實例級驗證伺服器設定等全部相關功能。舊版本遺留的離線 / 第三方檔案在讀取時會回落為微軟檔案，需要重新進行微軟登入後才能啟動
 
 ### 調整：介面
 
@@ -100,7 +100,7 @@ dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
 | 環境變數 | 缺少時的表現 |
 |---|---|
 | `PCL_CURSEFORGE_API_KEY` | CurseForge 官方介面回傳 403，自動回退 mcim 鏡像（需把下載源設為「自動」或「優先鏡像」） |
-| `PCL_MS_CLIENT_ID` | 微軟正版登入不可用，僅能使用離線登入 |
+| `PCL_MS_CLIENT_ID` | 微軟正版登入不可用（啟動器唯一的登入方式，缺失時無法登入） |
 | `PCL_NAID_CLIENT_ID` / `_SECRET` | Natayark ID 登入不可用（大廳已移除，通常不再需要） |
 
 ```bash

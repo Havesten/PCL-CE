@@ -753,23 +753,9 @@ public static partial class GameLaunch
         text = text.Replace(
             "{uuid}",
             _ReplaceToken(mcLoginLoader.output.Uuid?.ToLower(), escapeHandler));
-        return mcLoginLoader.input!.LoginType switch
-        {
-            McLoginType.Legacy => text.Replace(
-                "{login}",
-                _ReplaceToken("离线", escapeHandler)),
-
-            McLoginType.Ms => text.Replace(
-                "{login}",
-                _ReplaceToken("正版", escapeHandler)),
-
-            McLoginType.Auth => text.Replace(
-                "{login}",
-                _ReplaceToken("Authlib-Injector", escapeHandler)
-            ),
-
-            _ => text
-        };
+        return text.Replace(
+            "{login}",
+            _ReplaceToken("正版", escapeHandler));
     }
 
     private static string _ReplaceToken(string? value, Func<string, string>? escapeHandler)

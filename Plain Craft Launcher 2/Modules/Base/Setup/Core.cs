@@ -141,10 +141,6 @@ public partial class Setup
             new ConfigObserver(
                 ConfigEvent.Changed,
                 e => VersionRamType((int)e.Value!)));
-        Config.InstanceAuth.LoginRequirementSolutionConfig.Observe(
-            new ConfigObserver(
-                ConfigEvent.Changed,
-                e => VersionServerLogin((int)e.Value!)));
     }
 
     /// <summary>

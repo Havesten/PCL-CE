@@ -9,7 +9,7 @@ public record AuthorizeResult
     public bool IsError => !Error.IsNullOrEmpty();
 
     /// <summary>
-    /// 按 Yggdrasil Connect / OAuth 2.0 规范校验令牌响应的必须字段。
+    /// 按 OAuth 2.0 规范校验令牌响应的必须字段。
     /// 错误响应（error 存在时）不在此校验，交由调用方按错误处理。
     /// </summary>
     /// <param name="requireIdToken">授权时申请了 openid 权限范围则为 true，此时 id_token 条件必须</param>

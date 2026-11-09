@@ -49,21 +49,8 @@ public partial class PageLoginProfileSkin : IPageView
         Common.Log("[Profile] 刷新档案界面");
         Skin.Clear();
         var profile = ProfileService.Current ?? throw new InvalidOperationException("No profile selected.");
-        if (profile.ProfileType == ProfileType.Microsoft)
-        {
-            Common.Log("[Profile] 使用正版皮肤加载器");
-            Skin.loader = PageLaunchLeft.skinMs;
-        }
-        else if (profile.ProfileType is ProfileType.Authlib or ProfileType.YggdrasilConnect)
-        {
-            Common.Log("[Profile] 使用 Authlib 皮肤加载器");
-            Skin.loader = PageLaunchLeft.skinAuth;
-        }
-        else
-        {
-            Common.Log("[Profile] 使用离线皮肤加载器");
-            Skin.loader = PageLaunchLeft.skinLegacy;
-        }
+        Common.Log("[Profile] 使用正版皮肤加载器");
+        Skin.loader = PageLaunchLeft.skinMs;
 
         Skin.loader.Start(isForceRestart: true);
         _vm.Load(profile);
@@ -106,22 +93,7 @@ public partial class PageLoginProfileSkin : IPageView
     // 修改密码
     private void BtnEditPassword_Click(object sender, RoutedEventArgs e)
     {
-        var profile = ProfileService.Current;
-        if (profile?.ProfileType == ProfileType.Microsoft)
-        {
-            Common.OpenWebsite("https://account.live.com/password/Change");
-        }
-        else if ((profile?.ProfileType is ProfileType.Authlib or ProfileType.YggdrasilConnect) &&
-                 !string.IsNullOrWhiteSpace(profile.Server))
-        {
-            var server = profile.Server;
-            Common.OpenWebsite(server.Replace("/api/yggdrasil/authserver" + (server.EndsWithF("/") ? "/" : ""),
-                "/user/profile"));
-        }
-        else
-        {
-            HintService.Show(Hints.Info(Lang.Text("Launch.Account.ProfileSkin.PasswordUnsupported")));
-        }
+        Common.OpenWebsite("https://account.live.com/password/Change");
     }
 
     // 修改 ID
@@ -144,15 +116,7 @@ public partial class PageLoginProfileSkin : IPageView
     // 修改皮肤
     private void Skin_Click(object sender, RoutedEventArgs e)
     {
-        var profile = ProfileService.Current;
-        if (profile?.ProfileType == ProfileType.Microsoft)
-            ProfileUi.ChangeSkinMs();
-        else if ((profile?.ProfileType is ProfileType.Authlib or ProfileType.YggdrasilConnect) &&
-                 !string.IsNullOrWhiteSpace(profile.Server))
-            Common.OpenWebsite(profile.Server.BeforeFirst("api/yggdrasil/authserver") +
-                                "user/closet");
-        else
-                HintService.Show(Hints.Info(Lang.Text("Launch.Account.ProfileSkin.SkinUnsupported")));
+        ProfileUi.ChangeSkinMs();
     }
 
     // 保存皮肤
@@ -170,15 +134,7 @@ public partial class PageLoginProfileSkin : IPageView
     // 修改披风
     private void BtnSkinCape_Click(object sender, RoutedEventArgs e)
     {
-        var profile = ProfileService.Current;
-        if (profile?.ProfileType == ProfileType.Microsoft)
-            Skin.BtnSkinCape_Click(sender, e);
-        else if ((profile?.ProfileType is ProfileType.Authlib or ProfileType.YggdrasilConnect) &&
-                 !string.IsNullOrWhiteSpace(profile.Server))
-            Common.OpenWebsite(profile.Server.BeforeFirst("api/yggdrasil/authserver") +
-                                "user/closet");
-        else
-            HintService.Show(Hints.Info(Lang.Text("Launch.Account.ProfileSkin.CapeUnsupported")));
+        Skin.BtnSkinCape_Click(sender, e);
     }
 
     #endregion

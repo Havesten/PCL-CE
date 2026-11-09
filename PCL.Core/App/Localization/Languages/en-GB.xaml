@@ -967,7 +967,6 @@
     <sys:String x:Key="Instance.Overall.Reset.NotSupported">This instance does not support reset yet!</sys:String>
     <sys:String x:Key="Instance.Overall.Reset.QuiltUnsupported">Cannot reset: Quilt is no longer supported by this launcher.</sys:String>
     <sys:String x:Key="Instance.Overall.Script.ExportFailed">Export launch script failed</sys:String>
-    <sys:String x:Key="Instance.Overall.Script.Exporting">Exporting launch script...</sys:String>
     <sys:String x:Key="Instance.Overall.Script.ExportingWarning">Exporting launch script... (Note: using the script to launch may cause your login session to expire!)</sys:String>
     <sys:String x:Key="Instance.Overall.Script.FileFilter">Batch file (*.bat)|*.bat</sys:String>
     <sys:String x:Key="Instance.Overall.Script.SelectSaveTitle">Select where to save the script</sys:String>
@@ -1396,7 +1395,7 @@
     <sys:String x:Key="Instance.Setup.Advanced.Classpath">Additional classpath prefix</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.Classpath.ToolTip">Content will be added as Classpath entries at the head of this instance's launch arguments.&#xA;Absolute paths are required. Separate multiple entries with English semicolons (;).</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification">Disable file verification</sys:String>
-    <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification.ToolTip">Do not modify Assets at all; do not verify Libraries, third-party login libraries, or the instance main Jar file for modifications.&#xA;Do not enable this unless you have modified related files.</sys:String>
+    <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification.ToolTip">Do not modify Assets at all; do not verify Libraries or the instance main Jar file for modifications.&#xA;Do not enable this unless you have modified related files.</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.GameArgs.ToolTip">Content in this text box will be appended directly to the end of the launch arguments.&#xA;For example, entering --demo will launch the game in demo mode.&#xA;Supports substitution tokens from the Minecraft instance JSON, e.g. ${library_directory}.&#xA;&#xA;Leave empty to follow the global setting.</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility">Ignore Java compatibility warning</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility.ToolTip">If a manually selected Java is incompatible with this instance, automatically skip the compatibility warning popup and force the use of the manually selected Java.</sys:String>
@@ -1439,32 +1438,8 @@
 
     <!-- Instance.Setup.Server -->
 
-    <sys:String x:Key="Instance.Setup.Server.AuthServer">Target auth server</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.AuthServer.AutoFormatted">Auth server address automatically formatted!</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.AuthServer.Hint">Full address of the Yggdrasil API authentication server</sys:String>
     <sys:String x:Key="Instance.Setup.Server.AutoJoin">Automatic join</sys:String>
     <sys:String x:Key="Instance.Setup.Server.AutoJoin.ToolTip">Automatically join a server after Minecraft opens.&#xA;Separate IP and port with an colon, e.g. 233.233.233.233:12345.</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.CreateProfile">Create profile</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.HttpWarning">Using HTTP for login operations may expose your credentials in plaintext.&#xA;Unless you have a specific reason, always use HTTPS!</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Name">LittleSkin login</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Continue">Continue</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Message">Your third-party login settings will be overridden with LittleSkin login.&#xA;Do not proceed unless you are the server owner, or the server owner has instructed you to do so.&#xA;&#xA;Are you sure you want to override the current settings?</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LittleSkin.Override.Title">Confirm setting override</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod">Lock login method</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod.Message">You are about to lock the login method for this instance. Once locked, the login method requirement cannot be changed, and the game must be launched using the specified login method.&#xA;This feature may help some server owners.&#xA;Continue?</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LockLoginMethod.Title">Confirm login method lock</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginLockHint">The authentication method for this instance has been locked and cannot be changed. Please use the required authentication method to launch the game.</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.AuthOnly">Third-party login only (Authlib-Injector)</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.MicrosoftOnly">Microsoft login only</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.MicrosoftOrAuth">Microsoft or third-party login (Authlib-Injector)</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.LoginMethod.Unlimited">No restriction</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Name">Server name</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Name.Hint">Server name displayed on the login page</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Register">Registration link</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.Register.Hint">Web address for account registration, e.g. https://xxxxx.xxx/auth/register</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.RestrictLogin">Restrict login method</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.SetLittleSkin">Set to LittleSkin</sys:String>
-    <sys:String x:Key="Instance.Setup.Server.SslWarning">Disabling SSL certificate verification may expose your login credentials to third-party interception.&#xA;Unless you have a specific reason, always keep SSL certificate verification enabled!</sys:String>
     <sys:String x:Key="Instance.Setup.Server.Title">Server</sys:String>
 
     <!-- Launch -->
@@ -1481,8 +1456,6 @@
     <sys:String x:Key="Launch.Account.Login">Log in</sys:String>
     <sys:String x:Key="Launch.Account.LoginCancelled">Login cancelled!</sys:String>
     <sys:String x:Key="Launch.Account.Type.Microsoft">Microsoft</sys:String>
-    <sys:String x:Key="Launch.Account.Type.Offline">Offline</sys:String>
-    <sys:String x:Key="Launch.Account.Type.ThirdParty">Third-party</sys:String>
 
     <!-- Launch.Account.Auth -->
 
@@ -1494,14 +1467,11 @@
     <sys:String x:Key="Launch.Account.Auth.ForgotPassword">Forgot password</sys:String>
     <sys:String x:Key="Launch.Account.Auth.InvalidServer">The authentication server address is invalid.</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Login">Log in</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.LoginFailed">Third-party login failed.</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.LoginFailed.WithDetail">Third-party login failed.&#xA;&#xA;Original error:&#xA;{0}</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Logout">Log out</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Password">Password</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Preset.LittleSkin">Preset - LittleSkin</sys:String>
     <sys:String x:Key="Launch.Account.Auth.Register">Register</sys:String>
     <sys:String x:Key="Launch.Account.Auth.ServerLabel">Authentication server: {0}</sys:String>
-    <sys:String x:Key="Launch.Account.Auth.SelectServer">Select authentication server</sys:String>
     <sys:String x:Key="Launch.Account.Auth.OAuthLogin">Start OAuth login</sys:String>
     <sys:String x:Key="Launch.Account.Auth.UsePassword">»  Use password login</sys:String>
     <sys:String x:Key="Launch.Account.Auth.UseOAuth">»  Use OAuth login</sys:String>
@@ -1530,30 +1500,12 @@
     <sys:String x:Key="Launch.Account.Microsoft.Start">Log in</sys:String>
     <sys:String x:Key="Launch.Account.Microsoft.Website">»  Website</sys:String>
 
-    <!-- Launch.Account.Offline -->
 
-    <sys:String x:Key="Launch.Account.Offline.Back">Back</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Create">Create</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidPlayerId.Message">Your username does not meet the standard (3 - 16 characters, letters, numbers, and underscores only), which may cause some game versions to fail to launch or encounter errors.&#xA;It is strongly recommended to use a standard username!&#xA;If you insist on using this username, you can continue.</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidPlayerId.Title">Invalid username</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.InvalidUuid">UUID does not meet requirements: {0}</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.PlayerId">Username</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.PlayerId.ToolTip">3 - 16 characters, letters, numbers, and underscores only</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Custom.Input.ToolTip">Must be a 32-character hexadecimal string without hyphens</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Custom.ToolTip">For advanced users. If you do not know what this is, do not select this option.</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Legacy">Legacy</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Legacy.ToolTip">Use legacy PCLCE-NS UUID generation rules.&#xA;If some single-player save data is missing after upgrading from an older PCLCE-NS version, try this option.</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Standard">Standard</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.Uuid.Standard.ToolTip">[Recommended] The generated UUID is consistent with other launchers such as HMCL, BakaXL, and Bukkit.</sys:String>
-    <sys:String x:Key="Launch.Account.Offline.UuidStandard">UUID standard</sys:String>
 
     <!-- Launch.Account.Profile -->
 
-    <sys:String x:Key="Launch.Account.Profile.ChangeAuthServerName">Change authentication server name</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.ChangeUuid">Change UUID</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CopyUuid">Copy UUID</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Create">New profile</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Create.SelectAuthType.Title">New profile - Select login type</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CreateAndSelectHint">Create and select a profile before launching the game</sys:String>
     <sys:String x:Key="Launch.Account.Profile.RequireMicrosoftHint">A Microsoft profile is required to create profiles using other login types</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Created">Profile created!</sys:String>
@@ -1561,8 +1513,6 @@
     <sys:String x:Key="Launch.Account.Profile.DeleteConfirm.Message">You are about to delete this profile. This action cannot be undone.&#xA;Are you sure you want to continue?</sys:String>
     <sys:String x:Key="Launch.Account.Profile.DeleteConfirm.Title">Confirm profile deletion</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Deleted">Profile deleted!</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.EditServerName.Message">Enter the new authentication server name.</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.EditServerName.Title">Change authentication server name</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.ChangeId">Failed to change username.</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.ChangeSkin">Failed to change skin</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Error.Corrupted">Failed to read profile data. The file may be corrupted; the profile file has been backed up and reset.</sys:String>
@@ -1571,16 +1521,7 @@
     <sys:String x:Key="Launch.Account.Profile.ImportExport">Import / Export</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Saved">Profile saved!</sys:String>
     <sys:String x:Key="Launch.Account.Profile.SelectHint">Select a profile before launching the game</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.ChangeTitle">Change UUID for profile {0}</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Hint">32 characters, no hyphens</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.InvalidChars">UUID should only contain letters and numbers!</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Legacy">Legacy PCL UUID (if single-player save data is missing, try this option)</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.SelectType.Title">New profile - Select UUID type</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Uuid.Standard">Standard UUID (recommended)</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.EmptyUsername">Username cannot be empty!</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.QuoteInUsername">Username cannot contain quotation marks!</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Validation.UnknownAuthType">Unknown login type.</sys:String>
-    <sys:String x:Key="Launch.Account.Profile.Validation.UsernameTooLong">Starting from version 1.20.3, usernames can contain a maximum of 16 characters!</sys:String>
 
     <!-- Launch.Account.Profile.EditPlayerId -->
 
@@ -1598,16 +1539,13 @@
 
     <!-- Launch.Account.ProfileSkin -->
 
-    <sys:String x:Key="Launch.Account.ProfileSkin.CapeUnsupported">This profile does not support changing the cape!</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.ChangeCape">Change cape</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.ChangeSkin">Change skin</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditPassword">Edit password</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditProfile">Edit profile</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.EditUsername">Edit username</sys:String>
-    <sys:String x:Key="Launch.Account.ProfileSkin.PasswordUnsupported">This profile does not support changing the password!</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.RefreshSkin">Refresh</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SaveSkin">Save skin</sys:String>
-    <sys:String x:Key="Launch.Account.ProfileSkin.SkinUnsupported">This profile does not support changing the skin!</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SkinsAndCapes">Skins and capes</sys:String>
     <sys:String x:Key="Launch.Account.ProfileSkin.SwitchProfile">Switch accounts</sys:String>
 
@@ -1642,8 +1580,6 @@
 
     <sys:String x:Key="Launch.Skin.ChangeCape">Change cape</sys:String>
     <sys:String x:Key="Launch.Skin.ChangeSuccess">Skin changed successfully!</sys:String>
-    <sys:String x:Key="Launch.Skin.Error.AuthGet">Failed to get Authlib-Injector skin. ({0})</sys:String>
-    <sys:String x:Key="Launch.Skin.Error.AuthlibRateLimited">Failed to get the Authlib-Injector skin. Too many requests were made. Please try again in 5 minutes.</sys:String>
     <sys:String x:Key="Launch.Skin.Error.MsGet">Failed to get Microsoft skin. ({0})</sys:String>
     <sys:String x:Key="Launch.Skin.Error.MsRateLimited">Skin fetch has been rate-limited. Please try again in 5 minutes. ({0})</sys:String>
     <sys:String x:Key="Launch.Skin.Fetching">Obtaining the skin, please wait!</sys:String>
@@ -1885,9 +1821,6 @@
 
     <!-- Main.FileDrag -->
 
-    <sys:String x:Key="Main.FileDrag.AuthlibInvalid">The Authlib authentication server does not match the URL format ({0})!</sys:String>
-    <sys:String x:Key="Main.FileDrag.CreateAuthlibProfile">Do you want to create a new third-party authentication profile?&#xA;Authentication server address: {0}</sys:String>
-    <sys:String x:Key="Main.FileDrag.CreateAuthlibProfileTitle">Create new third-party authentication profile</sys:String>
     <sys:String x:Key="Main.FileDrag.ExtractFirst">Please extract the file before dragging it in!</sys:String>
     <sys:String x:Key="Main.FileDrag.FileNotFound">The file dragged in does not exist: {0}</sys:String>
     <sys:String x:Key="Main.FileDrag.FileOnly">Please drag in a file instead of a folder!</sys:String>
@@ -1910,7 +1843,6 @@
     <sys:String x:Key="Minecraft.Skin.Error.InvalidSkinType">Invalid skin type: {0}</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.NoCustomSkin">User has not set a custom skin</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.NoSkinData">Skin response contains no skin data, possibly a user without custom skin</sys:String>
-    <sys:String x:Key="Minecraft.Skin.Error.OfflineNoSkin">Offline UUID has no official skin.</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.PropertyNotFound">No matching property found in skin response</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.SkinReturnEmpty">Skin return value is empty, possibly a user without custom skin</sys:String>
     <sys:String x:Key="Minecraft.Skin.Error.UuidEmpty">UUID is empty.</sys:String>
@@ -2164,8 +2096,6 @@
 
     <sys:String x:Key="Minecraft.Launch.Error.AlreadyLaunching">A game is already launching!</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CancelProcess">Failed to cancel launch and terminate process</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Error.CannotConnectAuthServer">Unable to connect to third-party login server. ({0})</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Error.CannotConnectAuthServerWithDetail">Unable to connect to third-party login server ({0}).&#xA;Details:</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CannotLaunch">Cannot launch Minecraft: {0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.CustomCommand">Failed to execute custom command</sys:String>
     <sys:String x:Key="Minecraft.Launch.Error.DispatcherUnavailable">The launcher interface is unavailable and cannot run this action.</sys:String>
@@ -2223,26 +2153,7 @@
     <sys:String x:Key="Minecraft.Launch.Login.RefreshAccountFailed.Title">Failed to refresh account information</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Register">Register</sys:String>
 
-    <!-- Minecraft.Launch.Login.Auth -->
 
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.DetailPrefix">Details:</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.FailedTitle">Third-party login failed</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.InvalidProfile">Selected profile {0} is invalid!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.LoginFailed">Login failed: {0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.LoginFailed.WithDetail">Third-party login failed.&#xA;&#xA;Details:&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NetworkFailed.Message">Third-party login failed. Please check your network connection.</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NetworkFailed.WithDetail">Third-party login failed. Please check your network connection.&#xA;&#xA;Details:&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NoProfile">$You have not created a profile. Please create one first!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.NoProfileCannotSwitch">You have not created a profile, so you cannot switch profiles!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.OnlyOneProfile">There is only one profile in your account, so you cannot switch profiles!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.RefreshFailed">Login refresh failed</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.RefreshFailed.WithDetail">Login refresh failed.&#xA;&#xA;Details:&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.SecondRefreshFailed">Second login refresh failed</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.SelectProfile">Select profile</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.DetailMessage">$Login failed: Connection to login server timed out.&#xA;Please check your network connection!&#xA;Details:</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.Message">Login failed: Connection to login server timed out.&#xA;Please check your network connection!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.Timeout.WithDetail">Login failed because the connection to the login server timed out.&#xA;Please check your network connection.&#xA;&#xA;Details:&#xA;{0}</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Login.Auth.ValidationFailed.WithDetail">Login validation failed.&#xA;&#xA;Details:&#xA;{0}</sys:String>
 
     <!-- Minecraft.Launch.Login.Microsoft -->
 
@@ -2264,7 +2175,6 @@
 
     <!-- Minecraft.Launch.Precheck -->
 
-    <sys:String x:Key="Minecraft.Launch.Precheck.AuthServerMismatch">The third-party login server used by the current profile does not match the one required by this instance. Please use a matching profile!</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.Failed.WithDetail">Launch precheck failed: {0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.InstanceError">Minecraft has a problem: {0}</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.InvalidPathChars">Game path cannot contain ! or ; ({0})</sys:String>
@@ -2275,8 +2185,6 @@
     <sys:String x:Key="Minecraft.Launch.Precheck.NonAsciiPath.Message">The path of instance '{0}' contains characters that may affect the game (non-ASCII characters). Do you still want to launch?&#xA;&#xA;If you are unsure, you can choose 'Continue' first, and try modifying the game path if the game crashes shortly after launch.</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.NonAsciiPath.Title">Game path check</sys:String>
     <sys:String x:Key="Minecraft.Launch.Precheck.RequireMicrosoft">This instance requires Microsoft login. Please use a Microsoft login profile!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Precheck.RequireMicrosoftOrThirdParty">This instance requires Microsoft or third-party login. Please use a matching profile!</sys:String>
-    <sys:String x:Key="Minecraft.Launch.Precheck.RequireThirdParty">This instance requires third-party login. Please use a third-party login profile!</sys:String>
 
     <!-- Minecraft.Launch.Stage -->
 
@@ -2330,7 +2238,7 @@
     <sys:String x:Key="Select.Folder.CannotAddWhileDownloading">The game folder cannot be added whilst the download task is in progress!</sys:String>
     <sys:String x:Key="Select.Folder.CannotCreateWhileDownloading">The game folder cannot be created whilst the download task is in progress!</sys:String>
     <sys:String x:Key="Select.Folder.Cleanup.Keep">Keep</sys:String>
-    <sys:String x:Key="Select.Folder.Cleanup.Message">Do you want to clean up the PCLCE-NS config files in this folder?&#xA;This includes settings for each instance (such as custom icons, third-party login options, etc.). It has no effect on the instance itself.</sys:String>
+    <sys:String x:Key="Select.Folder.Cleanup.Message">Do you want to clean up the PCLCE-NS config files in this folder?&#xA;This includes settings for each instance (such as custom icons, etc.). It has no effect on the instance itself.</sys:String>
     <sys:String x:Key="Select.Folder.Cleanup.Title">Profile clean-up</sys:String>
     <sys:String x:Key="Select.Folder.Clear">Clear</sys:String>
     <sys:String x:Key="Select.Folder.Clear.Confirm">Clear</sys:String>

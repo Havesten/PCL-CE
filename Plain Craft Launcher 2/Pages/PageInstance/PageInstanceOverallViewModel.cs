@@ -160,10 +160,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
             if (GameLaunch.McLaunchStart(new GameLaunch.McLaunchOptions
                     { SaveBatch = savePath, instance = PageInstanceLeft.McInstance }))
             {
-                if (ProfileService.Current?.ProfileType == PCL.Core.Minecraft.Profile.Models.ProfileType.Offline)
-                    HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Script.Exporting")));
-                else
-                    HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Script.ExportingWarning")));
+                HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Script.ExportingWarning")));
             }
         }
         catch (Exception ex)

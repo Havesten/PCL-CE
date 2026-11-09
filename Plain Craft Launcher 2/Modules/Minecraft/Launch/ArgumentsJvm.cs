@@ -34,7 +34,6 @@ public static partial class GameLaunch
         dataList.Add($"\"-Djava.library.path={GetNativesFolder()}\"");
         dataList.Add("-cp ${classpath}");
 
-        _AddAuthlibInjectorJvmArgsOld(dataList);
         _AddDebugLog4jConfigJvmArgs(dataList, instance);
         _AddRendererJvmArgs(dataList);
         _AddProxyJvmArgs(dataList, instance);
@@ -79,42 +78,6 @@ public static partial class GameLaunch
             dataList.Add(
                 $"-Xms{Math.Floor(initialRam.Value * 1024d)
                     .ToString(CultureInfo.InvariantCulture)}m");
-    }
-
-    private static void _AddAuthlibInjectorJvmArgsOld(List<string> dataList)
-    {
-        if (mcLoginLoader.output.Type != "Auth")
-            return;
-
-        if (mcLaunchJavaSelected!.Installation.MajorVersion >= 6)
-            dataList.Add("-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT");
-
-        var server = (mcLoginAuthLoader.input!.BaseUrl ?? "").Replace("/authserver", "");
-        try
-        {
-            var response = Requester.FetchString(server);
-            var prefetched = Convert.ToBase64String(Encoding.UTF8.GetBytes(response));
-            dataList.Insert(
-                0,
-                $"-javaagent:\"{Path.Combine(Common.pathPure, "authlib-injector.jar")}\"={server} "
-                + $"-Dauthlibinjector.side=client -Dauthlibinjector.yggdrasil.prefetched={prefetched}");
-        }
-        catch (WebException ex)
-        {
-            throw new Exception(
-                Lang.Text(
-                    "Minecraft.Launch.Error.CannotConnectAuthServerWithDetail",
-                    server ?? null
-                )
-                + ex.InnerException,
-                ex);
-        }
-        catch (Exception ex)
-        {
-            throw new Exception(
-                Lang.Text("Minecraft.Launch.Error.CannotConnectAuthServer", server ?? null),
-                ex);
-        }
     }
 
     private static void _AddDebugLog4jConfigJvmArgs(List<string> dataList, McInstance instance)
@@ -209,7 +172,6 @@ public static partial class GameLaunch
         _CollectInheritedJvmArguments(dataList, instance);
         SecretLaunchJvmArgs(ref dataList);
 
-        _AddAuthlibInjectorJvmArgsNew(dataList);
         _AddLwjglUnsafeAgentJvmArgs(dataList);
         _AddDebugLog4jConfigJvmArgs(dataList, instance);
         _AddRendererJvmArgs(dataList);
@@ -255,32 +217,6 @@ public static partial class GameLaunch
                 break;
 
             currentInstance = new McInstance(currentInstance.InheritInstanceName);
-        }
-    }
-
-    private static void _AddAuthlibInjectorJvmArgsNew(List<string> dataList)
-    {
-        if (mcLoginLoader.output.Type != "Auth")
-            return;
-
-        if (mcLaunchJavaSelected!.Installation.MajorVersion >= 6)
-            dataList.Add("-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT");
-
-        var server = (mcLoginAuthLoader.input!.BaseUrl ?? "").Replace("/authserver", "");
-        try
-        {
-            var response = NetFacade.NetGetCodeByRequestRetry(server, Encoding.UTF8)?.ToString();
-            var prefetched = Convert.ToBase64String(Encoding.UTF8.GetBytes(response!));
-            dataList.Insert(
-                0,
-                $"-javaagent:\"{Path.Combine(Common.pathPure, "authlib-injector.jar")}\"={server} "
-                + $"-Dauthlibinjector.side=client -Dauthlibinjector.yggdrasil.prefetched={prefetched}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception(
-                Lang.Text("Minecraft.Launch.Error.CannotConnectAuthServer", server ?? null),
-                ex);
         }
     }
 

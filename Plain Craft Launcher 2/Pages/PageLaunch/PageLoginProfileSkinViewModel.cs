@@ -18,9 +18,6 @@ public partial class PageLoginProfileSkinViewModel : ViewModelBase
     {
         ProfileName = profile.UserName;
         ProfileTypeText = ProfileUi.GetProfileInfo(profile);
-        EditVisibility = profile.ProfileType is ProfileType.Microsoft or ProfileType.Authlib
-            or ProfileType.YggdrasilConnect
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        EditVisibility = Visibility.Visible;
     }
 }

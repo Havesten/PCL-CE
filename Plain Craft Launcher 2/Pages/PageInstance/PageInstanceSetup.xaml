@@ -236,15 +236,6 @@
             </local:MyCard>
             <local:MyCard x:Name="CardServer" Margin="0,0,0,15" Title="{loc:Loc Instance.Setup.Server.Title}">
                 <StackPanel Margin="25,42,25,18">
-                    <local:MyHint x:Name="HintServerLoginLock"
-                                  Text="{loc:Loc Instance.Setup.Server.LoginLockHint}" IsWarn="True"
-                                  Margin="0,0,0,13" Visibility="{Binding ServerLoginLockVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <local:MyHint x:Name="LabServerAuthServerSecurityVerify"
-                                  Text="{loc:Loc Instance.Setup.Server.SslWarning}" IsWarn="False"
-                                  Margin="0,0,0,13" Visibility="{Binding ServerSslWarningVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <local:MyHint x:Name="LabServerAuthServerSecurity"
-                                  Text="{loc:Loc Instance.Setup.Server.HttpWarning}"
-                                  Margin="0,0,0,13" Visibility="{Binding ServerHttpWarningVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
@@ -252,72 +243,12 @@
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="28" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="9" />
-                            <RowDefinition Height="28" />
                             <RowDefinition Height="3" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
-                                   Text="{loc:Loc Instance.Setup.Server.RestrictLogin}"
-                                   Margin="0,0,25,0" />
-                        <local:MyComboBox x:Name="ComboServerLoginRequire"
-                                          IsEnabled="{Binding ServerAuthEditable}" Grid.Row="0" Grid.ColumnSpan="2"
-                                          Tag="VersionServerLoginRequire" Grid.Column="1">
-                            <local:MyComboBoxItem
-                                Content="{loc:Loc Instance.Setup.Server.LoginMethod.Unlimited}"
-                                IsSelected="True" />
-                            <local:MyComboBoxItem
-                                Content="{loc:Loc Instance.Setup.Server.LoginMethod.MicrosoftOnly}" />
-                            <local:MyComboBoxItem
-                                Content="{loc:Loc Instance.Setup.Server.LoginMethod.AuthOnly}" />
-                            <local:MyComboBoxItem
-                                Content="{loc:Loc Instance.Setup.Server.LoginMethod.MicrosoftOrAuth}" />
-                        </local:MyComboBox>
-                        <TextBlock Name="LabServerAuthServer" Grid.Row="1" VerticalAlignment="Center"
-                                   HorizontalAlignment="Left" Text="{loc:Loc Instance.Setup.Server.AuthServer}"
-                                   Margin="0,8,25,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <local:MyTextBox x:Name="TextServerAuthServer"
-                                         IsEnabled="{Binding ServerAuthEditable}" Grid.Row="1" Grid.ColumnSpan="2"
-                                         ShowValidateResult="False" Tag="VersionServerAuthServer" Grid.Column="1"
-                                         TextChanged="TextBoxChange"
-                                         LostFocus="TextServerAuthServer_MouseLeave"
-                                         Text="{Binding ServerAuthServerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="0,8,0,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                         HintText="{loc:Loc Instance.Setup.Server.AuthServer.Hint}">
-                            <local:MyTextBox.ValidateRules>
-                                <val:HttpValidator />
-                            </local:MyTextBox.ValidateRules>
-                        </local:MyTextBox>
-                        <TextBlock Name="LabServerAuthRegister" Grid.Row="2" VerticalAlignment="Center"
-                                   HorizontalAlignment="Left" Text="{loc:Loc Instance.Setup.Server.Register}"
-                                   Margin="0,8,25,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <local:MyTextBox x:Name="TextServerAuthRegister"
-                                         IsEnabled="{Binding ServerAuthEditable}" Grid.Row="2" Grid.ColumnSpan="2"
-                                         ShowValidateResult="False" Tag="VersionServerAuthRegister" Grid.Column="1"
-                                         TextChanged="TextBoxChange"
-                                         Text="{Binding ServerAuthRegisterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="0,8,0,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                         HintText="{loc:Loc Instance.Setup.Server.Register.Hint}">
-                            <local:MyTextBox.ValidateRules>
-                                <val:HttpValidator AllowsNullOrEmpty="True" />
-                            </local:MyTextBox.ValidateRules>
-                        </local:MyTextBox>
-                        <TextBlock Name="LabServerAuthName" Grid.Row="3" VerticalAlignment="Center"
-                                   HorizontalAlignment="Left" Text="{loc:Loc Instance.Setup.Server.Name}"
-                                   Margin="0,8,25,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <local:MyTextBox x:Name="TextServerAuthName"
-                                         IsEnabled="{Binding ServerAuthEditable}" Grid.Row="3" Grid.ColumnSpan="2"
-                                         ShowValidateResult="False" Tag="VersionServerAuthName" Grid.Column="1"
-                                         TextChanged="TextBoxChange"
-                                         Text="{Binding ServerAuthNameText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="0,8,0,0" Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                         HintText="{loc:Loc Instance.Setup.Server.Name.Hint}" />
-                        <TextBlock VerticalAlignment="Center" Grid.Row="5" HorizontalAlignment="Left"
+                        <TextBlock VerticalAlignment="Center" Grid.Row="0" HorizontalAlignment="Left"
                                    Text="{loc:Loc Instance.Setup.Server.AutoJoin}"
                                    Margin="0,0,25,0" />
-                        <local:MyTextBox x:Name="TextServerEnter" Grid.ColumnSpan="2" Grid.Row="5"
+                        <local:MyTextBox x:Name="TextServerEnter" Grid.ColumnSpan="2" Grid.Row="0"
                                          Tag="VersionServerEnter" Grid.Column="1"
                                          TextChanged="TextBoxChange"
                                          Text="{Binding ServerEnterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -335,22 +266,6 @@
                             </local:MyTextBox.ValidateRules>
                         </local:MyTextBox>
                     </Grid>
-                    <local:MyButton x:Name="BtnServerAuthLittle"
-                                    IsEnabled="{Binding ServerAuthEditable}"
-                                    Command="{Binding ApplyLittleSkinCommand}"
-                                    Visibility="{Binding ServerAuthVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Height="35" MinWidth="150" Margin="0,12,0,0"
-                                    Text="{loc:Loc Instance.Setup.Server.SetLittleSkin}"
-                                    HorizontalAlignment="Left" ColorType="Highlight" />
-                    <local:MyButton x:Name="BtnServerAuthLock"
-                                    Visibility="{Binding ServerAuthLockVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Height="35" MinWidth="150" Margin="180,-35,0,0"
-                                    Text="{loc:Loc Instance.Setup.Server.LockLoginMethod}"
-                                    HorizontalAlignment="Left" IsEnabled="{Binding ServerAuthLockEnabled}"
-                                    Command="{Binding LockServerAuthCommand}" />
-                    <local:MyButton x:Name="BtnServerNewProfile"
-                                    Visibility="{Binding ServerNewProfileVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Height="35" MinWidth="150" Margin="360,-35,0,0"
-                                    Command="{Binding CreateServerProfileCommand}"
-                                    Text="{loc:Loc Instance.Setup.Server.CreateProfile}"
-                                    HorizontalAlignment="Left" />
                 </StackPanel>
             </local:MyCard>
             <local:MyCard x:Name="CardAdvance" Margin="0,0,0,15"

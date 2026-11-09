@@ -48,29 +48,7 @@ public partial class PageInstanceSetupViewModel : ViewModelBase
 
     [ObservableProperty] private bool _rendererEnabled = true;
 
-    [ObservableProperty] private bool _serverAuthEditable = true;
-
-    [ObservableProperty] private bool _serverAuthLockEnabled;
-
-    [ObservableProperty] private bool _serverAuthLockVisible = true;
-
-    [ObservableProperty] private string _serverAuthNameText = "";
-
-    [ObservableProperty] private string _serverAuthRegisterText = "";
-
-    [ObservableProperty] private string _serverAuthServerText = "";
-
-    [ObservableProperty] private bool _serverAuthVisible;
-
     [ObservableProperty] private string _serverEnterText = "";
-
-    [ObservableProperty] private bool _serverHttpWarningVisible;
-
-    [ObservableProperty] private bool _serverLoginLockVisible;
-
-    [ObservableProperty] private bool _serverNewProfileVisible = true;
-
-    [ObservableProperty] private bool _serverSslWarningVisible;
 
     [ObservableProperty] private bool _titleEmptyHintVisible = true;
 
@@ -233,36 +211,6 @@ public partial class PageInstanceSetupViewModel : ViewModelBase
         CheckAdvanceRunWaitVisible = !string.IsNullOrEmpty(command);
     }
 
-    public void RefreshServerLogin(int type, string authServerAddress)
-    {
-        var authVisible = type == 2 || type == 3;
-        ServerAuthVisible = authVisible;
-        ServerNewProfileVisible = authVisible && ProfileUi.CanCreateOtherProfile();
-        ServerAuthLockVisible = type != 0 && type != 1;
-        ServerAuthEditable = !Config.InstanceAuth.AuthLocked[PageInstanceLeft.McInstance.PathInstance];
-        ServerLoginLockVisible = !ServerAuthEditable;
-        if (!authVisible)
-        {
-            ServerHttpWarningVisible = false;
-            ServerSslWarningVisible = false;
-        }
-        else if (authServerAddress.StartsWithF("https://"))
-        {
-            ServerHttpWarningVisible = false;
-            ServerSslWarningVisible = true;
-        }
-        else if (authServerAddress.StartsWithF("http://"))
-        {
-            ServerHttpWarningVisible = true;
-            ServerSslWarningVisible = false;
-        }
-        else
-        {
-            ServerHttpWarningVisible = false;
-            ServerSslWarningVisible = false;
-        }
-    }
-
     public void RefreshTitleEmptyHint(string title)
     {
         TitleEmptyHintVisible = title.Length == 0;
@@ -292,86 +240,9 @@ public partial class PageInstanceSetupViewModel : ViewModelBase
 
     public void ResetSettings()
     {
-        if (!Config.InstanceAuth.AuthLocked[PageInstanceLeft.McInstance.PathInstance])
-            Config.InstanceAuth.Reset(PageInstanceLeft.McInstance.PathInstance);
         Config.Instance.Reset(PageInstanceLeft.McInstance.PathInstance);
         Common.Log("[Setup] 已初始化实例独立设置");
         HintService.Show(Hints.Success(Lang.Text("Instance.Setup.Initialize.Success"), log: false));
-    }
-
-    [RelayCommand]
-    private async Task ApplyLittleSkin()
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(ServerAuthServerText) &&
-                ServerAuthServerText != "https://littleskin.cn/api/yggdrasil")
-            {
-                var overrideResult = await Dialog.ShowAsync(new TextDialogRequest
-                {
-                    Title = Lang.Text("Instance.Setup.Server.LittleSkin.Override.Title"),
-                    Content = Lang.Text("Instance.Setup.Server.LittleSkin.Override.Message"),
-                    Buttons = DialogButtons.From(
-                        DialogButton.Create(Lang.Text("Instance.Setup.Server.LittleSkin.Override.Continue")),
-                        DialogButton.Create(Lang.Text("Common.Action.Cancel")))
-                }).ConfigureAwait(true);
-                if (overrideResult.Button == 2)
-                    return;
-            }
-            ServerAuthServerText = "https://littleskin.cn/api/yggdrasil";
-            ServerAuthRegisterText = "https://littleskin.cn/auth/register";
-            ServerAuthNameText = Lang.Text("Instance.Setup.Server.LittleSkin.Name");
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "应用 LittleSkin 登录设置失败", Common.LogLevel.Feedback,
-                userSummary: Lang.Text("Instance.Setup.Error.OperationFailed"));
-        }
-    }
-
-    [RelayCommand]
-    private void CreateServerProfile()
-    {
-        if (!ProfileUi.CanCreateOtherProfile())
-            return;
-
-        Launcher.frmMain.PageChange(new FormMain.PageStackData { page = FormMain.PageType.Launch });
-        PageLoginAuth.draggedAuthServer = ServerAuthServerText;
-        Common.RunInNewThread(() =>
-        {
-            Thread.Sleep(150);
-            Common.RunInUi(() => Launcher.frmLaunchLeft.RefreshPage(true, GameLaunch.McLoginType.Auth));
-        });
-    }
-
-    [RelayCommand]
-    private async Task LockServerAuth()
-    {
-        ServerAuthLockEnabled = false;
-        try
-        {
-            var lockResult = await Dialog.ShowAsync(new TextDialogRequest
-            {
-                Title = Lang.Text("Instance.Setup.Server.LockLoginMethod.Title"),
-                Content = Lang.Text("Instance.Setup.Server.LockLoginMethod.Message"),
-                Buttons = DialogButtons.OkCancel,
-                IsWarn = true
-            }).ConfigureAwait(true);
-            if (lockResult.Button == 1)
-            {
-                Config.InstanceAuth.AuthLocked[PageInstanceLeft.McInstance.PathInstance] = true;
-                Launcher.frmInstanceSetup?.Reload();
-            }
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "锁定登录方式失败", Common.LogLevel.Feedback,
-                userSummary: Lang.Text("Instance.Setup.Error.OperationFailed"));
-        }
-        finally
-        {
-            ServerAuthLockEnabled = true;
-        }
     }
 
     [RelayCommand]
