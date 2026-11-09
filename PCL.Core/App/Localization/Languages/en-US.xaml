@@ -1907,9 +1907,9 @@
     <sys:String x:Key="Main.Title.ResourceDownload">Resource download - {0}</sys:String>
     <sys:String x:Key="Main.Title.SaveManagement">Save management - {0}</sys:String>
     <sys:String x:Key="Main.Title.TaskManager">Task manager</sys:String>
-    <sys:String x:Key="Main.UpdateLog.Empty">Welcome!</sys:String>
+    <sys:String x:Key="Main.UpdateLog.Empty">No changelog was provided for this update.</sys:String>
     <sys:String x:Key="Main.UpdateLog.FullChangelog">Full changelog</sys:String>
-    <sys:String x:Key="Main.UpdateLog.Title">PCLCE-NS has been updated to {0} {1}</sys:String>
+    <sys:String x:Key="Main.UpdateLog.Title">PCLCE-NS has been updated to {0}</sys:String>
 
     <!-- Main.FileDrag -->
 

@@ -1813,9 +1813,9 @@
     <sys:String x:Key="Main.Title.ResourceDownload">資源下載 - {0}</sys:String>
     <sys:String x:Key="Main.Title.SaveManagement">存檔管理 - {0}</sys:String>
     <sys:String x:Key="Main.Title.TaskManager">任務管理</sys:String>
-    <sys:String x:Key="Main.UpdateLog.Empty">歡迎使用呀~</sys:String>
+    <sys:String x:Key="Main.UpdateLog.Empty">本次更新沒有附帶更新紀錄。</sys:String>
     <sys:String x:Key="Main.UpdateLog.FullChangelog">完整更新紀錄</sys:String>
-    <sys:String x:Key="Main.UpdateLog.Title">PCLCE-NS 已更新至 {0} {1}</sys:String>
+    <sys:String x:Key="Main.UpdateLog.Title">PCLCE-NS 已更新至 {0}</sys:String>
     <sys:String x:Key="Main.HomepageReset.Title">首頁預設已重設</sys:String>
     <sys:String x:Key="Main.HomepageReset.Content">由於啟動器更新，已重設首頁預設。請重新前往 設定 - 個性化 選擇預設</sys:String>
 

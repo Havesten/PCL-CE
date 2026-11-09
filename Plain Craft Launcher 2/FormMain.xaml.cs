@@ -41,20 +41,30 @@ public partial class FormMain
     {
         Common.RunInNewThread(() =>
         {
+            // 更新时写下的日志文件优先；缺失或为空时回退云端「更新」页配置的更新日志
             var changelogFile = $"{Common.pathTemp}CEUpdateLog.md";
-            string changelog;
-            if (File.Exists(changelogFile))
-                changelog = Common.ReadFile(changelogFile);
-            else
+            var changelog = File.Exists(changelogFile) ? Common.ReadFile(changelogFile) : "";
+            if (string.IsNullOrWhiteSpace(changelog))
+            {
+                try
+                {
+                    changelog = UpdateManager.FetchCloudChangelog();
+                }
+                catch (Exception ex)
+                {
+                    Common.Log(ex, "[UpdateLog] 获取云端更新日志失败");
+                }
+            }
+            if (string.IsNullOrWhiteSpace(changelog))
                 changelog = Lang.Text("Main.UpdateLog.Empty");
             if ((DialogService.Instance.Show(new MarkdownDialogRequest
             {
-                Title = Lang.Text("Main.UpdateLog.Title", Common.VersionBranchName, Common.VersionBaseName),
+                Title = Lang.Text("Main.UpdateLog.Title", Common.VersionBaseName),
                 Content = changelog,
                 Buttons = DialogButtons.Create("Common.Action.Confirm", "Main.UpdateLog.FullChangelog"),
                 ForceWait = true
             }).Result?.Button ?? 0) ==
-                2) Common.OpenWebsite("https://github.com/PCL-Community/PCL2-CE/releases");
+                2) Common.OpenWebsite("https://github.com/Havesten/PCL-CE/releases");
         }, "UpdateLog Output");
     }
 
