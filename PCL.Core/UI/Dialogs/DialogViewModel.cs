@@ -92,8 +92,12 @@ public sealed partial class DialogViewModel : ObservableObject
         TextDialogRequest text => text.Content,
         MarkdownDialogRequest markdown => markdown.Content,
         InputDialogRequest input => input.Content,
+        PhoneBindDialogRequest phoneBind => phoneBind.Content,
         _ => ""
     };
+
+    /// <summary>绑定手机号弹窗的请求（含发码/绑定委托）。</summary>
+    public PhoneBindDialogRequest? PhoneBind => Request as PhoneBindDialogRequest;
 
     public string InputDefaultValue => (Request as InputDialogRequest)?.DefaultValue ?? "";
 

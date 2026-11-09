@@ -39,7 +39,10 @@ public sealed record RelayUser(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("banned")] bool Banned = false);
+    [property: JsonPropertyName("banned")] bool Banned = false,
+    [property: JsonPropertyName("phone")] string? Phone = null,
+    [property: JsonPropertyName("phone_bound")] bool PhoneBound = false,
+    [property: JsonPropertyName("phone_bound_at")] DateTimeOffset? PhoneBoundAt = null);
 
 public sealed record RelayLoginResult(
     [property: JsonPropertyName("token")] string Token,
@@ -47,7 +50,9 @@ public sealed record RelayLoginResult(
     [property: JsonPropertyName("is_new")] bool IsNew,
     [property: JsonPropertyName("status")] string? Status,
     [property: JsonPropertyName("user")] RelayUser User,
-    [property: JsonPropertyName("quota")] RelayQuota Quota);
+    [property: JsonPropertyName("quota")] RelayQuota Quota,
+    [property: JsonPropertyName("force_bind_phone")] bool ForceBindPhone = false,
+    [property: JsonPropertyName("phone_required")] bool PhoneRequired = false);
 
 public sealed record RelayNode(
     [property: JsonPropertyName("id")] string Id,
@@ -99,7 +104,9 @@ public sealed record RelayMe(
     [property: JsonPropertyName("user")] RelayUser User,
     [property: JsonPropertyName("status")] string? Status,
     [property: JsonPropertyName("quota")] RelayQuota Quota,
-    [property: JsonPropertyName("allocations")] IReadOnlyList<RelayAllocation> Allocations)
+    [property: JsonPropertyName("allocations")] IReadOnlyList<RelayAllocation> Allocations,
+    [property: JsonPropertyName("force_bind_phone")] bool ForceBindPhone = false,
+    [property: JsonPropertyName("phone_required")] bool PhoneRequired = false)
 {
     /// <summary>服务端下发的账号状态，banned 时客户端不允许再分配端口。</summary>
     public bool IsBanned => string.Equals(Status, "banned", StringComparison.OrdinalIgnoreCase);
@@ -124,3 +131,13 @@ internal sealed record RelaySendCodeResult(
     [property: JsonPropertyName("delivered")] bool Delivered,
     [property: JsonPropertyName("ttl")] int Ttl,
     [property: JsonPropertyName("dev_code")] string? DevCode);
+
+/// <summary>绑定手机号接口的返回，phone 字段为绑定后的号码状态。</summary>
+internal sealed record RelaySmsBindResult(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("phone")] RelayPhoneState? Phone);
+
+public sealed record RelayPhoneState(
+    [property: JsonPropertyName("phone")] string Phone,
+    [property: JsonPropertyName("bound")] bool Bound,
+    [property: JsonPropertyName("bound_at")] DateTimeOffset? BoundAt);

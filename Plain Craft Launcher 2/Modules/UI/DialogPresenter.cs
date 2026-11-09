@@ -44,6 +44,7 @@ public sealed class DialogPresenter : IDialogPresenter
                 DialogKind.Input => new MyMsgInput(dialog),
                 DialogKind.Select => new MyMsgSelect(dialog),
                 DialogKind.Login => new MyMsgLogin(dialog),
+                DialogKind.PhoneBind => new MyMsgPhoneBind(dialog),
                 _ => null
             };
 

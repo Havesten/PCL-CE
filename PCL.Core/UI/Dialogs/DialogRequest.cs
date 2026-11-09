@@ -14,7 +14,8 @@ public enum DialogKind
     Markdown,
     Input,
     Select,
-    Login
+    Login,
+    PhoneBind
 }
 
 /// <summary>弹窗请求的公共部分。具体内容由各子类型提供。</summary>
@@ -97,4 +98,24 @@ public sealed record LoginDialogRequest : DialogRequest
     public Action<object?>? CompletionHandler { get; init; }
 
     public override DialogKind Kind => DialogKind.Login;
+}
+
+/// <summary>
+///     绑定手机号弹窗。发码与绑定动作由调用方注入，弹窗只负责交互与本地号码校验，
+///     避免 UI 层直接依赖具体业务接口。
+/// </summary>
+public sealed record PhoneBindDialogRequest : DialogRequest
+{
+    public string Content { get; init; } = "";
+
+    /// <summary>取一道人机验证，返回 (id, 题目)。</summary>
+    public required Func<Task<(string Id, string Prompt)>> GetCaptchaAsync { get; init; }
+
+    /// <summary>发送短信验证码，返回开发模式下服务端回显的验证码（线上为 null）。</summary>
+    public required Func<string, string, string, Task<string?>> SendSmsAsync { get; init; }
+
+    /// <summary>提交绑定（手机号, 验证码）。</summary>
+    public required Func<string, string, Task> BindAsync { get; init; }
+
+    public override DialogKind Kind => DialogKind.PhoneBind;
 }

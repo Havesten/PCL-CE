@@ -20,6 +20,9 @@
                     <local:MyButton x:Name="BtnLogout" DockPanel.Dock="Right" Text="退出登录"
                                     ColorType="Normal" Width="96" VerticalAlignment="Center"
                                     Visibility="Collapsed" Click="BtnLogout_Click" />
+                    <local:MyButton x:Name="BtnBindPhone" DockPanel.Dock="Right" Text="绑定手机号"
+                                    ColorType="Highlight" Width="96" Margin="0,0,8,0" VerticalAlignment="Center"
+                                    Visibility="Collapsed" Click="BtnBindPhone_Click" />
                     <StackPanel VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
                             <!-- 状态点：未登录灰、已登录绿、已过期橙、已封禁红 -->

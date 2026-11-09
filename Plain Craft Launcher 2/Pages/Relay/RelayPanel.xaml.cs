@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using PCL.Core.App;
 using PCL.Core.Link.Relay;
+using PCL.Core.UI.Dialogs;
 
 namespace PCL;
 
@@ -28,6 +29,8 @@ public partial class RelayPanel : UserControl
     private bool _hasNodes;
     private bool _busy;
     private bool _versionTooLow;
+    private RelayMe? _lastMe;
+    private bool _phonePrompted;
 
     public RelayPanel()
     {
@@ -84,6 +87,7 @@ public partial class RelayPanel : UserControl
         {
             ShowLoggedIn();
             await RefreshAsync().ConfigureAwait(true);
+            await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
             return;
         }
 
@@ -212,6 +216,7 @@ public partial class RelayPanel : UserControl
             ApplyQuota(result.Quota);
             SetStatus(result.IsNew ? "注册成功，已自动创建账号" : "登录成功");
             await RefreshAsync().ConfigureAwait(true);
+            await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -235,6 +240,58 @@ public partial class RelayPanel : UserControl
         SetStatus("已退出登录");
     }
 
+    // ---------------------------------------------------------------- 手机号绑定
+
+    private async void BtnBindPhone_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_session.IsValid) return;
+        _phonePrompted = false;
+        await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     服务端启用「强制绑定手机号」且当前账号未绑定时，弹窗要求绑定。
+    ///     每次登录主动弹一次，之后可通过账号卡上的「绑定手机号」按钮再次打开。
+    /// </summary>
+    private async Task PromptBindPhoneIfNeededAsync()
+    {
+        if (_lastMe is not { PhoneRequired: true } || _phonePrompted) return;
+        _phonePrompted = true;
+        try
+        {
+            var result = await DialogService.Instance.ShowAsync(new PhoneBindDialogRequest
+            {
+                Title = "绑定手机号",
+                Content = "根据服务端要求，需要绑定手机号后才能使用联机功能。手机号固定 +86，请填写 11 位中国大陆号码。",
+                Buttons = DialogButtons.From(
+                    DialogButton.Create("绑定手机号"),
+                    DialogButton.Create("稍后再说")),
+                ForceWait = true,
+                GetCaptchaAsync = async () =>
+                {
+                    var captcha = await _api.GetCaptchaAsync().ConfigureAwait(false);
+                    return (captcha.Id, captcha.Prompt);
+                },
+                SendSmsAsync = (phone, captchaId, answer) => _api.SendSmsCodeAsync(phone, captchaId, answer),
+                BindAsync = (phone, code) => _api.BindPhoneAsync(phone, code)
+            }).ConfigureAwait(true);
+
+            if (result.Button == 1)
+            {
+                SetStatus("手机号绑定成功");
+                await RefreshAsync().ConfigureAwait(true);
+            }
+            else
+            {
+                SetStatus("尚未绑定手机号，绑定后才能分配端口");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus("绑定手机号失败：" + ex.Message);
+        }
+    }
+
     // ---------------------------------------------------------------- 数据
 
     private async Task RefreshAsync()
@@ -244,6 +301,7 @@ public partial class RelayPanel : UserControl
         {
             await CheckVersionAsync().ConfigureAwait(true);
             var me = await _api.GetMeAsync().ConfigureAwait(true);
+            _lastMe = me;
             ApplyMe(me);
             ApplyQuota(me.Quota);
             ApplyAllocations(me.Allocations);
@@ -263,12 +321,14 @@ public partial class RelayPanel : UserControl
         }
     }
 
-    /// <summary>把账号状态（邮箱、用户组、封禁）刷到界面上。</summary>
+    /// <summary>把账号状态（邮箱、用户组、封禁、手机号）刷到界面上。</summary>
     private void ApplyMe(RelayMe me)
     {
         _banned = me.IsBanned;
         SetAuthState(_banned ? AuthState.Banned : AuthState.LoggedIn, me);
         if (_banned) SetStatus("账号已被封禁");
+        // 未绑定手机号且服务端强制绑定时，账号卡上给一个手动入口
+        BtnBindPhone.Visibility = me.PhoneRequired ? Visibility.Visible : Visibility.Collapsed;
         UpdateButtons();
     }
 
@@ -341,6 +401,14 @@ public partial class RelayPanel : UserControl
             return;
         }
 
+        // 强制绑定手机号：未绑定时先弹窗，绑定成功后再让用户重新点分配
+        if (_lastMe is { PhoneRequired: true })
+        {
+            _phonePrompted = false;
+            await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
+            return;
+        }
+
         if (ComboNodes.SelectedItem is not RelayNode node || string.IsNullOrEmpty(node.Id))
         {
             SetStatus("请选择节点");
@@ -386,6 +454,11 @@ public partial class RelayPanel : UserControl
         {
             SetStatus(ex.Message);
             await RefreshAsync().ConfigureAwait(true);
+            if (_lastMe is { PhoneRequired: true })
+            {
+                _phonePrompted = false;
+                await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
+            }
         }
         finally
         {
@@ -548,6 +621,10 @@ public partial class RelayPanel : UserControl
 
                 var parts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(email)) parts.Add(email);
+                if (me?.User.PhoneBound == true && !string.IsNullOrWhiteSpace(me.User.Phone))
+                    parts.Add("+86 " + me.User.Phone);
+                else if (me?.ForceBindPhone == true)
+                    parts.Add("未绑定手机号");
                 if (!string.IsNullOrWhiteSpace(me?.Quota.GroupName)) parts.Add("用户组 " + me!.Quota.GroupName);
                 if (me?.Quota.CustomQuota == true) parts.Add("单独配额");
                 if (_session.ExpiresAt != default)
@@ -562,9 +639,12 @@ public partial class RelayPanel : UserControl
         PanLogin.Visibility = Visibility.Visible;
         PanQuota.Visibility = Visibility.Collapsed;
         BtnLogout.Visibility = Visibility.Collapsed;
+        BtnBindPhone.Visibility = Visibility.Collapsed;
         SetAuthState(expired ? AuthState.Expired : AuthState.LoggedOut);
         BtnStop.Visibility = Visibility.Collapsed;
         _banned = false;
+        _lastMe = null;
+        _phonePrompted = false;
         UpdateButtons();
     }
 

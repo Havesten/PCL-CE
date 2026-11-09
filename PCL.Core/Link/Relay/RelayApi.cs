@@ -72,6 +72,33 @@ public sealed class RelayApi
     public async Task<RelayMe> GetMeAsync(CancellationToken ct = default) =>
         await SendAsync<RelayMe>(HttpMethod.Get, "/api/v1/me", null, ct).ConfigureAwait(false);
 
+    /// <summary>
+    ///     发送绑定手机号的短信验证码（需已登录 + 人机验证）。
+    ///     返回开发模式下服务端回显的验证码（线上为 null）。
+    /// </summary>
+    public async Task<string?> SendSmsCodeAsync(string phone, string captchaId, string captchaAnswer,
+        CancellationToken ct = default)
+    {
+        var res = await SendAsync<RelaySendCodeResult>(HttpMethod.Post, "/api/v1/auth/sms/send-code", new
+        {
+            phone,
+            captcha_id = captchaId,
+            captcha_answer = captchaAnswer
+        }, ct).ConfigureAwait(false);
+        return res.DevCode;
+    }
+
+    /// <summary>校验短信验证码并把手机号绑定到当前账号。</summary>
+    public async Task<RelayPhoneState?> BindPhoneAsync(string phone, string code, CancellationToken ct = default)
+    {
+        var res = await SendAsync<RelaySmsBindResult>(HttpMethod.Post, "/api/v1/auth/sms/bind", new
+        {
+            phone,
+            code
+        }, ct).ConfigureAwait(false);
+        return res.Phone;
+    }
+
     public async Task<IReadOnlyList<RelayNode>> GetNodesAsync(CancellationToken ct = default)
     {
         var res = await SendAsync<RelayNodeList>(HttpMethod.Get, "/api/v1/relay/nodes", null, ct)
@@ -173,6 +200,13 @@ public sealed class RelayApi
         "email_domain_not_allowed" => "该邮箱后缀不允许注册，请换一个邮箱",
         "register_limited" => "当前网络注册过于频繁，请稍后再试",
         "register_closed" => "服务器暂时关闭了注册，请稍后再试",
+        "invalid_phone" => "手机号格式不正确：需 11 位、1 开头，且不能有 7 位及以上连号",
+        "phone_taken" => "该手机号已绑定其他账号",
+        "phone_required" => "请先绑定手机号",
+        "phone_hourly_limit" => "该号码本小时发送次数已达上限",
+        "sms_closed" => "服务器暂时关闭了短信发送",
+        "sms_not_configured" => "服务端未配置短信服务，请联系管理员",
+        "sms_failed" => "短信发送失败，请稍后重试",
         "nat_range_out_of_node" => "当前节点端口不在允许范围内，请联系管理员",
         "traffic_exhausted" => "本月流量已用完",
         "port_quota_exhausted" => "端口配额已用完，请先释放已有端口",
