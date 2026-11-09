@@ -124,7 +124,9 @@ public sealed record RelayStatus(
     [property: JsonPropertyName("required_version")] string? RequiredVersion = null);
 
 internal sealed record RelayErrorBody(
-    [property: JsonPropertyName("error")] string? Error);
+    [property: JsonPropertyName("error")] string? Error,
+    [property: JsonPropertyName("detail")] string? Detail = null,
+    [property: JsonPropertyName("retry_in")] int? RetryIn = null);
 
 internal sealed record RelaySendCodeResult(
     [property: JsonPropertyName("ok")] bool Ok,

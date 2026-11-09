@@ -167,8 +167,17 @@ public sealed class RelayApi
     {
         try
         {
-            var err = System.Text.Json.JsonSerializer.Deserialize<RelayErrorBody>(body)?.Error;
-            if (!string.IsNullOrWhiteSpace(err)) return Describe(err, status);
+            var err = System.Text.Json.JsonSerializer.Deserialize<RelayErrorBody>(body);
+            if (!string.IsNullOrWhiteSpace(err?.Error))
+            {
+                // 短信失败的具体原因只有服务端知道（阿里云返回码翻好的中文），有就原样带给用户，
+                // 否则只会看到「短信发送失败」这种帮不上忙的提示。
+                if (err.Error == "sms_failed" && !string.IsNullOrWhiteSpace(err.Detail))
+                    return "短信发送失败：" + err.Detail;
+                if (err.Error == "too_frequent" && err.RetryIn is int wait && wait > 0)
+                    return $"验证码已发送，请 {wait} 秒后再试";
+                return Describe(err.Error, status);
+            }
         }
         catch (System.Text.Json.JsonException)
         {
