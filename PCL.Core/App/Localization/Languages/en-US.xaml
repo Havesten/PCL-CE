@@ -2464,9 +2464,6 @@
 
     <sys:String x:Key="Setup.About.Community.Info">The development team of Plain Craft Launcher Community Edition!</sys:String>
     <sys:String x:Key="Setup.About.Community.Name">PCL Community</sys:String>
-    <sys:String x:Key="Setup.About.Contributors.Title">Contributors</sys:String>
-    <sys:String x:Key="Setup.About.Contributors.ViewMore">View more</sys:String>
-    <sys:String x:Key="Setup.About.Error.LoadContributorsFailed">Failed to load contributor information</sys:String>
     <sys:String x:Key="Setup.About.GitHubHome">GitHub page</sys:String>
     <sys:String x:Key="Setup.About.Licenses.Title">Licenses and copyrights</sys:String>
     <sys:String x:Key="Setup.About.Licenses.ViewLicense">License document</sys:String>
@@ -2475,6 +2472,9 @@
     <sys:String x:Key="Setup.About.OriginalAuthor.Name">LTCat (龙腾猫跃)</sys:String>
     <sys:String x:Key="Setup.About.SourceCode">Source code</sys:String>
     <sys:String x:Key="Setup.About.SponsorOriginalAuthor">Sponsor original author</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Name">This project</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Info">The open-source repository of PCLCE-NS!</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Open">View repository</sys:String>
     <sys:String x:Key="Setup.About.Title">About</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.CopyrightText">Copyright © 龙腾猫跃 2016. All Rights Reserved.&#xD;Computer Software Copyright Registration No.: 2020SR0875133&#xD;Report violations to: hexdragon@vip.qq.com&#xD;NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.OpenSource">Source code</sys:String>
@@ -2514,70 +2514,30 @@
 
     <!-- Setup.About.Legal -->
 
-    <sys:String x:Key="Setup.About.Legal.CommunityLobbyPrivacy">Community lobby privacy policy</sys:String>
     <sys:String x:Key="Setup.About.Legal.CommunitySource">PCLCE-NS source code</sys:String>
     <sys:String x:Key="Setup.About.Legal.CopyrightText">Copyright © PCL Community &amp; LTCat (龙腾猫跃) 2026.&#xD;NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</sys:String>
-    <sys:String x:Key="Setup.About.Legal.NatayarkTerms">Natayark OpenID ToS</sys:String>
     <sys:String x:Key="Setup.About.Legal.OtherInfo">Other information</sys:String>
     <sys:String x:Key="Setup.About.Legal.PrivacyNotice">Privacy statement</sys:String>
     <sys:String x:Key="Setup.About.Legal.PrivacyText">The User Agent of this software includes the launcher version number to count the number of users on each version.&#xD;Other than this, this software will not upload any other information to the developers.&#xD;* Online and hardware/software survey features follow their own privacy policies, which are separate from this notice.</sys:String>
     <sys:String x:Key="Setup.About.Legal.Title">Legal information</sys:String>
 
-    <!-- Setup.About.SpecialThanks -->
 
-    <sys:String x:Key="Setup.About.SpecialThanks.GoBlog">Blog</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Bmclapi">Provided BMCLAPI mirror and Forge installation tool. Details at https://bmclapi.bangbang93.com</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Cloud">Provided cloud services for PCLCE-NS.</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.IconDesign">Designed and created the PCLCE-NS icon.</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.LinkModule">Provided the multiplayer module!</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Mcim">Provided MCIM community resource mirrors and image hosting services for the help center!</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Mcmod">Provided Chinese translation of mods and more related information!</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Bangbang93">bangbang93</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.EasyTier">EasyTier</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Emperormummy">Emperormummy</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Mcmod">MCMod (MC 百科)</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Pysio">Pysio @ Akaere Network</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Yunmoan">云默安 @ 至远光辉</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Z0z0r4">z0z0r4</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.OpenMcmod">Website</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.OpenWebsite">Website</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.SponsorMirror">Sponsor mirror</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Title">Special thanks</sys:String>
 
     <!-- Setup.Feedback -->
 
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Submit.Action">Send feedback</sys:String>
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Submit.Message">{0}&#xA;&#xA;Would you like to send feedback? Without a report, this problem may not be resolved.</sys:String>
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Update.Message">{0}&#xA;&#xA;Updating PCLCE-NS to the latest version may resolve this problem.</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.Submitter">Submitter: {0} ({1})</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.Type">Type: {0}</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.ViewDetail">Details</sys:String>
-    <sys:String x:Key="Setup.Feedback.LoadFailed">Unable to get content</sys:String>
-    <sys:String x:Key="Setup.Feedback.Loading">Loading feedback list...</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.Message">To report a bug, click Open folder and upload the log file containing the error from Launch-{0}-[number].log.&#xA;&#xA;Game crashes are usually unrelated to the launcher. Please do not submit launcher feedback only because the game crashed.</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.NotNeeded">Not needed</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.Title">Feedback reminder</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Description">Please check the feedback list for similar issues before submitting new feedback to avoid duplicate submissions.&#xA;Note: This page does not show all feedback. To view more, please go to GitHub.</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Open">New feedback</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Title">Submit feedback</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.CheckFailed.Action">Check again</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.CheckFailed.Message">Update checking failed, so feedback cannot be sent.&#xA;Connect to the internet, check for updates, confirm that the problem still occurs on the latest version, then send feedback.</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.NotLatest.Action">Update</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.NotLatest.Message">You are not using the latest version of PCLCE-NS, so feedback cannot be sent.&#xA;Update PCLCE-NS, confirm that the problem still occurs on the latest version, then send feedback.</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.Title">Cannot send feedback</sys:String>
-    <sys:String x:Key="Setup.Feedback.Uncategorized">Uncategorized</sys:String>
 
-    <!-- Setup.Feedback.Status -->
 
-    <sys:String x:Key="Setup.Feedback.Status.Completed">Completed</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Declined">Declined</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Duplicate">Duplicate</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Ignored">Ignored</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Paused">Paused</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Processing">Processing</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.UpNext">Up next</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Waiting">Waiting</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.WaitingProcess">Awaiting processing</sys:String>
 
     <!-- Setup.GameLink -->
 
@@ -2859,10 +2819,6 @@
     <sys:String x:Key="Setup.Left.Category.About">About</sys:String>
     <sys:String x:Key="Setup.Left.Category.Game">Game</sys:String>
     <sys:String x:Key="Setup.Left.Category.Launcher">Launcher</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.Message">Please check the feedback list for similar issues before submitting new feedback to avoid duplicate submissions.</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.SubmitNew">New feedback</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.Title">Feedback</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.ViewList">Feedback list</sys:String>
     <sys:String x:Key="Setup.Left.Refreshing">Refreshing...</sys:String>
     <sys:String x:Key="Setup.Left.Reset.GameManage.Message">Do you want to initialize all settings on the Game – Management page? This action cannot be undone.</sys:String>
     <sys:String x:Key="Setup.Left.Reset.Language.Message">Do you want to initialize all settings on the Launcher – Language page? This action cannot be undone.</sys:String>
@@ -2874,7 +2830,6 @@
     <!-- Setup.Left.Item -->
 
     <sys:String x:Key="Setup.Left.Item.About">About</sys:String>
-    <sys:String x:Key="Setup.Left.Item.Feedback">Feedback</sys:String>
     <sys:String x:Key="Setup.Left.Item.GameManage">Management</sys:String>
     <sys:String x:Key="Setup.Left.Item.Java">Java</sys:String>
     <sys:String x:Key="Setup.Left.Item.Launch">Launch</sys:String>
@@ -3069,7 +3024,6 @@
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.Export">Export</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.FeatureHide">Feature hiding</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.FeatureHide.ToolTip">Only this tab will be hidden. Disabled content settings are still valid.&#xA;This can avoid feature hiding being changed while keeping the Personalization page.</sys:String>
-    <sys:String x:Key="Setup.Ui.FeatureHide.Item.Feedback">Feedback</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.GameManage">Management</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.InstanceSelect">Selection</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.InstanceSelect.ToolTip">Hide the selection and properties buttons below the Launch button.</sys:String>

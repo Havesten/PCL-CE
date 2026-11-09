@@ -1,14 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
 using PCL.Core.UI.Dialogs;
-using PCL.Core.IO.Net.Http;
-using PCL.Core.Utils;
 using PCL.Core.ViewModel;
 
 namespace PCL;
@@ -18,33 +14,9 @@ public partial class PageSetupAboutViewModel : ViewModelBase
 {
     private int _clickCount;
 
-    private bool _initialized;
-
     [ObservableProperty] private string _aboutInfo = FormatVersionInfo();
 
-    [ObservableProperty] private bool _showMcmod = true;
-
     [ObservableProperty] private bool _isLogoClickEnabled = true;
-
-    public ObservableCollection<PageSetupAbout.GitHubContributor> Contributors { get; } = [];
-
-    public void Initialize()
-    {
-        ShowMcmod = Lang.IsChineseMainland;
-        if (_initialized) return;
-        _initialized = true;
-        LoadContributorsCommand.Execute(null);
-    }
-
-    [RelayCommand]
-    public async Task LoadContributorsAsync()
-    {
-        var contributors = await RunAsync(ct => Task.Run(FetchContributorsAsync, ct));
-        if (contributors is null) return;
-        Contributors.Clear();
-        foreach (var contributor in contributors)
-            Contributors.Add(contributor);
-    }
 
     [RelayCommand]
     public void RotateCommunityLogo(object? sender)
@@ -181,13 +153,5 @@ public partial class PageSetupAboutViewModel : ViewModelBase
             .Replace("%VERSIONCODE%", Common.VersionCode.ToString())
             .Replace("%BRANCH%", Common.VersionBranchName)
             .Replace("%COMMIT_HASH%", Common.CommitHashShort);
-    }
-
-    private static async Task<List<PageSetupAbout.GitHubContributor>> FetchContributorsAsync()
-    {
-        using var response = await HttpRequest
-            .Create("https://api.github.com/repos/PCL-Community/PCL2-CE/contributors").SendAsync();
-        response.EnsureSuccessStatusCode();
-        return await response.AsJsonAsync<List<PageSetupAbout.GitHubContributor>>(JsonCompat.SerializerOptions) ?? [];
     }
 }

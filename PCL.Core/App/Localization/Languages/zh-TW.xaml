@@ -2367,9 +2367,6 @@
 
     <sys:String x:Key="Setup.About.Community.Info">Plain Craft Launcher Community Edition 的開發團隊！</sys:String>
     <sys:String x:Key="Setup.About.Community.Name">PCL Community</sys:String>
-    <sys:String x:Key="Setup.About.Contributors.Title">貢獻者們</sys:String>
-    <sys:String x:Key="Setup.About.Contributors.ViewMore">檢視更多</sys:String>
-    <sys:String x:Key="Setup.About.Error.LoadContributorsFailed">載入貢獻者資訊失敗</sys:String>
     <sys:String x:Key="Setup.About.GitHubHome">GitHub 首頁</sys:String>
     <sys:String x:Key="Setup.About.Licenses.Title">許可與版權宣告</sys:String>
     <sys:String x:Key="Setup.About.Licenses.ViewLicense">檢視許可檔案</sys:String>
@@ -2378,6 +2375,9 @@
     <sys:String x:Key="Setup.About.OriginalAuthor.Name">龙腾猫跃（龍騰貓躍）</sys:String>
     <sys:String x:Key="Setup.About.SourceCode">檢視原始碼</sys:String>
     <sys:String x:Key="Setup.About.SponsorOriginalAuthor">贊助原作者</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Name">本項目</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Info">PCLCE-NS 的開源專案倉庫！</sys:String>
+    <sys:String x:Key="Setup.About.ThisProject.Open">檢視倉庫</sys:String>
     <sys:String x:Key="Setup.About.Title">關於</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.CopyrightText">Copyright © 龙腾猫跃 2016. All Rights Reserved.&#xD;電腦軟體著作權登記號：2020SR0875133&#xD;違法違規行為檢舉投訴信箱：hexdragon@vip.qq.com&#xD;非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 批准，也不與 MOJANG 或 MICROSOFT 關聯。</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.OpenSource">原始碼</sys:String>
@@ -2417,70 +2417,30 @@
 
     <!-- Setup.About.Legal -->
 
-    <sys:String x:Key="Setup.About.Legal.CommunityLobbyPrivacy">PCLCE-NS 連線大廳隱私政策</sys:String>
     <sys:String x:Key="Setup.About.Legal.CommunitySource">PCLCE-NS 開放原始碼</sys:String>
     <sys:String x:Key="Setup.About.Legal.CopyrightText">Copyright © 2026 PCL Community &amp; 龙腾猫跃.&#xD;非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 批准，也不與 MOJANG 或 MICROSOFT 關聯。</sys:String>
-    <sys:String x:Key="Setup.About.Legal.NatayarkTerms">Natayark OpenID 服務條款</sys:String>
     <sys:String x:Key="Setup.About.Legal.OtherInfo">其他資訊</sys:String>
     <sys:String x:Key="Setup.About.Legal.PrivacyNotice">隱私說明</sys:String>
     <sys:String x:Key="Setup.About.Legal.PrivacyText">本軟體的 User Agent 中包含啟動器的版本號，以統計各版本的使用者數量。&#xD;除此之外，本軟體不會向開發者上傳任何其他資訊。&#xD;* 連線與軟硬體調查相關功能遵循其自身的隱私政策，與上述說明不通用。</sys:String>
     <sys:String x:Key="Setup.About.Legal.Title">版權宣告與法律資訊</sys:String>
 
-    <!-- Setup.About.SpecialThanks -->
 
-    <sys:String x:Key="Setup.About.SpecialThanks.GoBlog">轉到部落格</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Bmclapi">提供 BMCLAPI 鏡像來源和 Forge 安裝工具，詳見 https://bmclapi.bangbang93.com</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Cloud">提供了 PCLCE-NS 的相關雲服務</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.IconDesign">設計並製作了 PCLCE-NS 的圖示</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.LinkModule">提供了連線模組</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Mcim">提供了 MCIM 社群資源鏡像來源和幫助庫圖床！</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Info.Mcmod">提供了模組名稱的中文翻譯和更多相關資訊！</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Bangbang93">bangbang93</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.EasyTier">EasyTier</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Emperormummy">Emperormummy</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Mcmod">MC 百科</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Pysio">Pysio @ Akaere Network</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Yunmoan">雲默安 @ 至遠光輝</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Name.Z0z0r4">z0z0r4</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.OpenMcmod">開啟百科</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.OpenWebsite">開啟網站</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.SponsorMirror">贊助鏡像來源</sys:String>
-    <sys:String x:Key="Setup.About.SpecialThanks.Title">特別鳴謝</sys:String>
 
     <!-- Setup.Feedback -->
 
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Submit.Action">回饋</sys:String>
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Submit.Message">{0}&#xA;&#xA;是否回饋此問題？如果不回饋，這個問題可能永遠無法得到解決！</sys:String>
     <sys:String x:Key="Setup.Feedback.ErrorPrompt.Update.Message">{0}&#xA;&#xA;將 PCLCE-NS 更新至最新版或許可以解決這個問題。</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.Submitter">提交者：{0}（{1}）</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.Type">型別：{0}</sys:String>
-    <sys:String x:Key="Setup.Feedback.Item.ViewDetail">檢視詳情</sys:String>
-    <sys:String x:Key="Setup.Feedback.LoadFailed">無法取得到內容</sys:String>
-    <sys:String x:Key="Setup.Feedback.Loading">正在取得回饋清單</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.Message">若要彙報 Bug，請點擊「開啟資料夾」並上傳 Launch-{0}-[一串數字].log 中包含錯誤資訊的檔案。&#xA;&#xA;遊戲崩潰一般與啟動器無關，請不要因為遊戲崩潰而提交啟動器回饋。</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.NotNeeded">不需要</sys:String>
     <sys:String x:Key="Setup.Feedback.Reminder.Title">回饋提交提醒</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Description">在提交回饋之前，先查詢一下是否存在重複回饋，如果有重複回饋，那麼請不要再次提交回饋，這樣會加劇維護者的負擔……&#xA;注意：此頁面未展示所有的回饋，如需檢視更多回饋，請前往 GitHub。</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Open">前往回饋</sys:String>
-    <sys:String x:Key="Setup.Feedback.Submit.Title">提交回饋</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.CheckFailed.Action">重新檢查更新</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.CheckFailed.Message">檢查更新失敗，因此無法提交回饋。&#xA;請連線網際網路，檢查更新後確認該問題在最新版中依然存在，再提交回饋。</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.NotLatest.Action">更新</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.NotLatest.Message">目前 PCLCE-NS 不是最新版，因此無法提交回饋。&#xA;請更新後確認該問題在最新版中依然存在，再提交回饋。</sys:String>
     <sys:String x:Key="Setup.Feedback.Unavailable.Title">無法提交回饋</sys:String>
-    <sys:String x:Key="Setup.Feedback.Uncategorized">未分類</sys:String>
 
-    <!-- Setup.Feedback.Status -->
 
-    <sys:String x:Key="Setup.Feedback.Status.Completed">已完成</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Declined">已拒絕</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Duplicate">重複</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Ignored">已忽略</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Paused">暫停</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Processing">正在處理</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.UpNext">在即</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.Waiting">等待</sys:String>
-    <sys:String x:Key="Setup.Feedback.Status.WaitingProcess">等待處理</sys:String>
 
     <!-- Setup.GameLink -->
 
@@ -2753,10 +2713,6 @@
     <sys:String x:Key="Setup.Left.Category.About">關於</sys:String>
     <sys:String x:Key="Setup.Left.Category.Game">遊戲</sys:String>
     <sys:String x:Key="Setup.Left.Category.Launcher">啟動器</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.Message">在提交新回饋前，建議先搜尋回饋清單，以避免重複提交。&#xA;如果無法開啟該網頁，請嘗試使用加速器或 VPN。</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.SubmitNew">提交新回饋</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.Title">回饋</sys:String>
-    <sys:String x:Key="Setup.Left.Feedback.ViewList">檢視回饋清單</sys:String>
     <sys:String x:Key="Setup.Left.Refreshing">正在重新整理……</sys:String>
     <sys:String x:Key="Setup.Left.Reset.GameManage.Message">是否要初始化 遊戲-管理 頁面的所有設定？該操作不可復原。</sys:String>
     <sys:String x:Key="Setup.Left.Reset.Language.Message">是否要初始化 啟動器-語言 頁面的所有設定？該操作不可復原。</sys:String>
@@ -2768,7 +2724,6 @@
     <!-- Setup.Left.Item -->
 
     <sys:String x:Key="Setup.Left.Item.About">軟體資訊</sys:String>
-    <sys:String x:Key="Setup.Left.Item.Feedback">回饋</sys:String>
     <sys:String x:Key="Setup.Left.Item.GameManage">管理</sys:String>
     <sys:String x:Key="Setup.Left.Item.Java">Java</sys:String>
     <sys:String x:Key="Setup.Left.Item.Launch">啟動</sys:String>
@@ -2962,7 +2917,6 @@
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.Export">匯出</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.FeatureHide">功能隱藏</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.FeatureHide.ToolTip">僅隱藏本頁籤，設定的停用內容依然有效。&#xA;可以在保留個人化設定畫面的情況下避免隱藏設定被修改。</sys:String>
-    <sys:String x:Key="Setup.Ui.FeatureHide.Item.Feedback">回饋</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.GameManage">管理</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.InstanceSelect">實例管理</sys:String>
     <sys:String x:Key="Setup.Ui.FeatureHide.Item.InstanceSelect.ToolTip">隱藏啟動按鈕下方的實例選擇與實例設定入口。</sys:String>

@@ -25,6 +25,7 @@
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
+                        <RowDefinition Height="45" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="40" />
@@ -101,253 +102,36 @@
                         Grid.Row="2"
                         Grid.Column="2"
                         Height="35"
-                        local:CustomEventService.EventData="https://github.com/PCL-Community/PCL2-CE"
+                        local:CustomEventService.EventData="https://github.com/Havesten/PCL-CE"
                         local:CustomEventService.EventType="OpenUrl"
                         Text="{loc:Loc Setup.About.SourceCode}" />
-                </Grid>
-            </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="{loc:Loc Setup.About.SpecialThanks.Title}">
-                <Grid Margin="21,40,21,16">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="45" />
-                        <RowDefinition x:Name="RowMcmod" Height="45" />
-                        <RowDefinition Height="45" />
-                        <RowDefinition Height="45" />
-                        <RowDefinition Height="45" />
-                        <RowDefinition Height="45" />
-                        <RowDefinition Height="45" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="40" />
-                        <ColumnDefinition />
-                        <ColumnDefinition Width="150" />
-                    </Grid.ColumnDefinitions>
                     <local:MyListItem
-                        Grid.Row="0"
+                        Grid.Row="3"
                         Grid.Column="1"
                         Margin="-5,0,15,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.Bmclapi}"
+                        Info="{loc:Loc Setup.About.ThisProject.Info}"
                         IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Bangbang93}" />
-                    <local:MyButton
-                        Grid.Row="0"
-                        Grid.Column="2"
-                        Height="35"
-                        local:CustomEventService.EventData="https://afdian.com/a/bangbang93"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.SpecialThanks.SponsorMirror}" />
-                    <local:MyListItem
-                        x:Name="ItemMcmod"
-                        Grid.Row="1"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Visibility="{Binding ViewModel.ShowMcmod, Converter={StaticResource BooleanToVisibilityConverter}, RelativeSource={RelativeSource AncestorType=local:PageSetupAbout}}"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.Mcmod}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Mcmod}" />
-                    <local:MyButton
-                        x:Name="BtnMcmod"
-                        Grid.Row="1"
-                        Grid.Column="2"
-                        Height="35"
-                        Visibility="{Binding ViewModel.ShowMcmod, Converter={StaticResource BooleanToVisibilityConverter}, RelativeSource={RelativeSource AncestorType=local:PageSetupAbout}}"
-                        local:CustomEventService.EventData="https://www.mcmod.cn"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.SpecialThanks.OpenMcmod}" />
-                    <local:MyListItem
-                        Grid.Row="2"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.Cloud}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Pysio}" />
-                    <local:MyButton
-                        Grid.Row="2"
-                        Grid.Column="2"
-                        Height="35"
-                        local:CustomEventService.EventData="https://www.pysio.online"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.SpecialThanks.GoBlog}" />
-                    <local:MyListItem
+                        Title="{loc:Loc Setup.About.ThisProject.Name}" />
+                    <Image
                         Grid.Row="3"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.Cloud}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Yunmoan}" />
+                        Margin="3"
+                        Source="/Plain Craft Launcher 2;component/Images/Heads/Logo-CE.png">
+                        <Image.Clip>
+                            <EllipseGeometry
+                                Center="17 17"
+                                RadiusX="17"
+                                RadiusY="17" />
+                        </Image.Clip>
+                    </Image>
                     <local:MyButton
                         Grid.Row="3"
                         Grid.Column="2"
                         Height="35"
-                        local:CustomEventService.EventData="https://www.zyghit.cn"
+                        local:CustomEventService.EventData="https://github.com/Havesten/PCL-CE"
                         local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.SpecialThanks.OpenWebsite}" />
-                    <local:MyListItem
-                        Grid.Row="4"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.LinkModule}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.EasyTier}" />
-                    <local:MyButton
-                        Grid.Row="4"
-                        Grid.Column="2"
-                        Height="35"
-                        local:CustomEventService.EventData="https://easytier.cn"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.SpecialThanks.OpenWebsite}" />
-                    <local:MyListItem
-                        Grid.Row="5"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.Mcim}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Z0z0r4}" />
-                    <local:MyListItem
-                        Grid.Row="6"
-                        Grid.Column="1"
-                        Grid.ColumnSpan="2"
-                        Margin="-5,0,0,0"
-                        Info="{loc:Loc Setup.About.SpecialThanks.Info.IconDesign}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.SpecialThanks.Name.Emperormummy}" />
-                    <Image
-                        Grid.Row="0"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/bangbang93.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        x:Name="ImgMcmod"
-                        Grid.Row="1"
-                        Margin="3"
-                        Visibility="{Binding ViewModel.ShowMcmod, Converter={StaticResource BooleanToVisibilityConverter}, RelativeSource={RelativeSource AncestorType=local:PageSetupAbout}}"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/wiki.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        Grid.Row="2"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/Pysio.jpg">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        Grid.Row="3"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/Yunmoan.jpg">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        Grid.Row="4"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/EasyTier.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        Grid.Row="5"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/z0z0r4.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <Image
-                        Grid.Row="6"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/Emperormummy.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
+                        Text="{loc:Loc Setup.About.ThisProject.Open}" />
                 </Grid>
             </local:MyCard>
-            <local:MyCard
-                Margin="0,0,0,15"
-                DataContext="{Binding ViewModel, RelativeSource={RelativeSource AncestorType=local:PageSetupAbout}}"
-                Title="{loc:Loc Setup.About.Contributors.Title}">
-                <Grid Margin="17,42,15,20">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="5" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <ItemsControl ItemsSource="{Binding Contributors}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel
-                                    Width="72"
-                                    Margin="4,8"
-                                    HorizontalAlignment="Center"
-                                    Orientation="Vertical">
-                                    <local:MyImage
-                                        Width="36"
-                                        Height="36"
-                                        CornerRadius="18"
-                                        RenderOptions.BitmapScalingMode="HighQuality"
-                                        Source="{Binding AvatarUrl}" />
-                                    <local:MyTextButton
-                                        MaxWidth="90"
-                                        Margin="0,8,0,0"
-                                        HorizontalAlignment="Center"
-                                        FontSize="14"
-                                        local:CustomEventService.EventData="{Binding HtmlUrl}"
-                                        local:CustomEventService.EventType="OpenUrl"
-                                        Text="{Binding Login}"
-                                        ToolTip="{Binding Login}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <local:MyTextButton
-                        Grid.Row="2"
-                        HorizontalAlignment="Center"
-                        local:CustomEventService.EventData="https://github.com/PCL-Community/PCL2-CE/graphs/contributors"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.Contributors.ViewMore}" />
-                </Grid>
-            </local:MyCard>
-
             <local:MyCard
                 Margin="0,0,0,15"
                 CanSwap="True"
@@ -381,22 +165,10 @@
                         <local:MyButton
                             Margin="0,0,20,0"
                             ColorType="Highlight"
-                            local:CustomEventService.EventData="https://github.com/PCL-Community/PCL2-CE"
+                            local:CustomEventService.EventData="https://github.com/Havesten/PCL-CE"
                             local:CustomEventService.EventType="OpenUrl"
                             Padding="13,0"
                             Text="{loc:Loc Setup.About.Legal.CommunitySource}" />
-                        <local:MyButton
-                            Margin="0,0,20,0"
-                            local:CustomEventService.EventData="https://www.pclc.cc/privacy/personal-info-brief.html"
-                            local:CustomEventService.EventType="OpenUrl"
-                            Padding="13,0"
-                            Text="{loc:Loc Setup.About.Legal.CommunityLobbyPrivacy}" />
-                        <local:MyButton
-                            Margin="0,0,20,0"
-                            local:CustomEventService.EventData="https://account.naids.com/policy"
-                            local:CustomEventService.EventType="OpenUrl"
-                            Padding="13,0"
-                            Text="{loc:Loc Setup.About.Legal.NatayarkTerms}" />
                     </StackPanel>
                 </StackPanel>
             </local:MyCard>

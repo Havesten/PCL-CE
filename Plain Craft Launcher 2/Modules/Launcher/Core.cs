@@ -51,7 +51,6 @@ public static partial class Launcher
     public static PageSetupJava? frmSetupJava;
     public static PageSetupAbout? frmSetupAbout;
     public static PageSetupLog? frmSetupLog;
-    public static PageSetupFeedback? frmSetupFeedback;
     public static PageSetupLauncherLanguage? frmSetupLauncherLanguage;
     public static PageSetupLauncherMisc? frmSetupLauncherMisc;
     public static PageLoginMs? frmLoginMs;

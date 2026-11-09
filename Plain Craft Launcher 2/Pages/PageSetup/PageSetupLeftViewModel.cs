@@ -28,8 +28,6 @@ public partial class PageSetupLeftViewModel : ViewModelBase
             PageID = FormMain.PageSubType.SetupAbout;
         else if (!hideCfg.SetupUpdate)
             PageID = FormMain.PageSubType.SetupUpdate;
-        else if (!hideCfg.SetupFeedback)
-            PageID = FormMain.PageSubType.SetupFeedback;
         else if (!hideCfg.SetupLog)
             PageID = FormMain.PageSubType.SetupLog;
         else
