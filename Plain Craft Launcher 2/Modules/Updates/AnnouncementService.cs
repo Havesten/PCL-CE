@@ -19,9 +19,18 @@ public static class AnnouncementService
             .Split("|".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
             .ToList();
 
-        var showAnnounce = UpdateManager.remoteServer.GetAnnouncementList().Content
-            .Where(x => !showedAnnounced.Contains(x.Id))
-            .ToList();
+        List<VersionAnnouncementContentModel> showAnnounce;
+        try
+        {
+            showAnnounce = UpdateManager.remoteServer.GetAnnouncementList().Content
+                .Where(x => !showedAnnounced.Contains(x.Id))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, "[System] 获取公告失败");
+            return;
+        }
 
         Common.Log("[System] 需要展示的公告数量：" + showAnnounce.Count);
 

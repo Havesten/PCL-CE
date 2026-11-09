@@ -18,24 +18,54 @@ public static class UpdateManager
     ///     更新源。目前只指向自建服务（cloud/pcl-cloud），不再向社区公共源发起请求。
     ///     <para>
     ///         地址统一由 <see cref="CloudEndpoints" /> 提供，与中继联机 API 共用同一个根地址。
-    ///         自建服务实现了同一套 apiv2 协议：
-    ///         版本清单取 <c>{基地址}apiv2/updates/updates-{通道}{架构}.json</c>，
-    ///         公告取 <c>{基地址}apiv2/announcement.json</c>，缓存键取 <c>{基地址}apiv2/cache.json</c>。
+    ///         自建服务的 Web 后台「更新」独立配置页保存后生成 <c>apiv2/updateinfo.json</c>，
+    ///         启动器据此获取：是否强制更新、最新版本、强制最低版本、下载直链、更新日志与公告。
     ///     </para>
     /// </summary>
-    public static UpdatesWrapperModel remoteServer = new(new List<IUpdateSource>
-    {
-        new UpdatesMinioModel(CloudEndpoints.UpdateRoot, "Fuukir")
-    });
+    private static readonly UpdatesCloudModel _cloudSource = new(CloudEndpoints.UpdateRoot, "PCLCE-NS Cloud");
+
+    public static UpdatesWrapperModel remoteServer = new(new List<IUpdateSource> { _cloudSource });
 
     /// <summary>
     ///     是否启用启动器在线服务：启动时的自动更新检查、服务端公告、更新页的自动检查。
     ///     <para>
-    ///         置为 <c>false</c> 后启动阶段不再向更新源发起任何版本或公告请求，也不会弹出公告；
-    ///         更新页仍可手动点击「检查更新」。
+    ///         更新源为自建云端（<c>apiv2/updateinfo.json</c>），配置由 Web 后台「更新」页管理。
     ///     </para>
     /// </summary>
-    public const bool OnlineServiceEnabled = false;
+    public const bool OnlineServiceEnabled = true;
+
+    /// <summary>
+    ///     从云端获取更新日志正文（updateinfo.json 的 changelog 字段），
+    ///     供「查看更新日志」按钮展示。每次都重新拉取，保证内容最新。
+    /// </summary>
+    public static string FetchCloudChangelog()
+    {
+        _cloudSource.RefreshCache();
+        return _cloudSource.Changelog;
+    }
+
+    /// <summary>
+    ///     是否命中强制更新：云端「是否强制更新」开启，
+    ///     或当前版本低于云端「强制最低版本」（留空则不按版本强制）。
+    /// </summary>
+    public static bool IsForceRequired(VersionDataModel version)
+    {
+        if (version is null)
+            return false;
+        if (version.ForceUpdate)
+            return true;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(version.MinVersion))
+                return SemVer.Parse(Common.VersionBaseName) < SemVer.Parse(version.MinVersion);
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, "[Update] 强制最低版本号解析失败");
+        }
+
+        return false;
+    }
 
     public static bool IsCurrentVersionBeta
     {
@@ -95,6 +125,7 @@ public static class UpdateManager
         var dlTargetPath = Common.ExePath + @"PCL\Plain Craft Launcher Community Edition.exe";
         Common.RunInNewThread(() =>
         {
+            var effectiveType = type;
             try
             {
                 var version = remoteServer.GetLatestVersion(
@@ -107,7 +138,17 @@ public static class UpdateManager
                     $"[Update] 远程最新版本: {version.VersionName}, 当前版本: {Common.VersionBaseName}");
                 if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
                     return;
-                if (type == UpdateEnums.UpdateType.PromptOnly)
+
+                // 强制更新（云端「是否强制更新」或低于「强制最低版本」）不允许跳过：
+                // 即使更新设置为「仅提示」，也直接下载并安装。
+                effectiveType = type;
+                if (type == UpdateEnums.UpdateType.PromptOnly && IsForceRequired(version))
+                {
+                    Common.Log("[Update] 命中强制更新，跳过询问直接下载安装");
+                    effectiveType = UpdateEnums.UpdateType.UpdateNow;
+                }
+
+                if (effectiveType == UpdateEnums.UpdateType.PromptOnly)
                 {
                     Common.RunInUi(() =>
                     {
@@ -135,17 +176,20 @@ public static class UpdateManager
                     SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, dlTargetPath));
                 loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Check"), _ =>
                 {
+                    // 云端下载直链不附带哈希时跳过校验
+                    if (string.IsNullOrWhiteSpace(version.Sha256))
+                        return;
                     var curHash = Common.GetFileSha256(dlTargetPath);
                     if ((curHash ?? "") != (version.Sha256 ?? ""))
                         throw new Exception(Lang.Text("Update.Error.Sha256Mismatch", version.Sha256, curHash));
                 }));
-                if (type == UpdateEnums.UpdateType.UpdateNow)
+                if (effectiveType == UpdateEnums.UpdateType.UpdateNow)
                     loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Install"),
                         _ => UpdateRestart(true)));
-                else if (type == UpdateEnums.UpdateType.Silent)
+                else if (effectiveType == UpdateEnums.UpdateType.Silent)
                     loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Prepare"),
                         _ => isUpdateWaitingRestart = true));
-                else if (type == UpdateEnums.UpdateType.DownloadAndPrompt)
+                else if (effectiveType == UpdateEnums.UpdateType.DownloadAndPrompt)
                     loaders.Add(new Loading.LoaderTask<int, int>(
                         Lang.Text("Update.Task.ShowButton"), _ =>
                     {
@@ -185,7 +229,7 @@ public static class UpdateManager
                 updateLoader =
                     new Loading.LoaderCombo<JsonObject>(Lang.Text("Update.Title"), loaders);
                 updateLoader.Start();
-                if (type == UpdateEnums.UpdateType.UpdateNow)
+                if (effectiveType == UpdateEnums.UpdateType.UpdateNow)
                 {
                     Loading.LoaderTaskbarAdd(updateLoader);
                     Launcher.frmMain.BtnExtraDownload.ShowRefresh();
@@ -195,7 +239,7 @@ public static class UpdateManager
             catch (Exception ex)
             {
                 Common.Log(ex, "[Update] 获取启动器更新失败");
-                if (type != UpdateEnums.UpdateType.Silent)
+                if (effectiveType != UpdateEnums.UpdateType.Silent)
                     HintService.Show(Hints.Error(Lang.Text("Update.Error.FetchFailed")));
             }
         });
@@ -251,13 +295,15 @@ public static class UpdateManager
         if (target is null)
             throw new Exception(Lang.Text("Update.Error.UnableToGetUpdate"));
         if (File.Exists(latestPCLPath) &&
-            (Common.GetFileSha256(latestPCLPath) ?? "") == (target.Sha256 ?? ""))
+            (string.IsNullOrWhiteSpace(target.Sha256) ||
+             (Common.GetFileSha256(latestPCLPath) ?? "") == (target.Sha256 ?? "")))
         {
             Common.Log("[System] 最新版 PCL 已存在，跳过下载");
             return;
         }
 
-        if ((Common.GetFileSha256(Basics.ExecutablePath) ?? "") ==
+        if (!string.IsNullOrWhiteSpace(target.Sha256) &&
+            (Common.GetFileSha256(Basics.ExecutablePath) ?? "") ==
             (target.Sha256 ?? "")) // 正在使用的版本符合要求，直接拿来用
         {
             Common.CopyFile(Basics.ExecutablePath, latestPCLPath);
@@ -308,7 +354,33 @@ public static class UpdateManager
                 break;
             default:
                 Common.Log("[Update] 更新设置: 不自动检查更新");
+                // 强制更新不受「不自动检查更新」设置影响
+                CheckForceUpdate();
                 return;
+        }
+    }
+
+    /// <summary>
+    ///     仅执行强制更新检查：不打扰普通用户，
+    ///     但命中云端「是否强制更新」或「强制最低版本」时必须更新。
+    /// </summary>
+    private static void CheckForceUpdate()
+    {
+        try
+        {
+            var version = remoteServer.GetLatestVersion(
+                IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
+                SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64);
+            if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
+                return;
+            if (!IsForceRequired(version))
+                return;
+            Common.Log("[Update] 命中强制更新，不受「不自动检查更新」设置影响");
+            UpdateStart(UpdateEnums.UpdateType.PromptOnly);
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, "[Update] 强制更新检查失败");
         }
     }
 }

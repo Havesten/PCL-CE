@@ -55,16 +55,8 @@ public partial class PageSetupUpdate : IPageView
         _vm.Reload();
         Animations.AniEndControl();
 
-        // 在线服务禁用时不自动请求更新源，但仍显示当前版本与「检查更新」按钮供手动检查
-        if (UpdateManager.OnlineServiceEnabled)
-        {
-            CheckUpdate();
-        }
-        else
-        {
-            _vm.ShowCheckCard = true;
-            Common.Log("[Update] 在线服务已禁用，更新页跳过自动检查");
-        }
+        // 进入页面时自动检查一次更新（更新源为自建云端 updateinfo.json）
+        CheckUpdate();
     }
 
     private async Task<UpdateStatus> IsLatestAsync()
@@ -116,11 +108,21 @@ public partial class PageSetupUpdate : IPageView
                             ? UpdateChannel.beta
                             : UpdateChannel.stable, SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64);
                     _vm.UpdateNameText = "PCLCE-NS " + VersionNameFormat(updateInfo.VersionName);
-                    var summary = updateInfo.Changelog.Between("<summary>", "</summary>");
-                    if (!updateInfo.Changelog.Contains("<summary>") || string.IsNullOrWhiteSpace(summary.Trim()))
-                        _vm.ChangelogText = Lang.Text("Setup.Update.Changelog.Empty");
+                    // 云端更新日志为纯文本/Markdown；旧清单格式用 <summary> 包裹摘要
+                    var changelog = updateInfo.Changelog ?? "";
+                    if (changelog.Contains("<summary>"))
+                    {
+                        var summary = changelog.Between("<summary>", "</summary>");
+                        _vm.ChangelogText = string.IsNullOrWhiteSpace(summary.Trim())
+                            ? Lang.Text("Setup.Update.Changelog.Empty")
+                            : summary;
+                    }
                     else
-                        _vm.ChangelogText = summary;
+                    {
+                        _vm.ChangelogText = string.IsNullOrWhiteSpace(changelog.Trim())
+                            ? Lang.Text("Setup.Update.Changelog.Empty")
+                            : changelog;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -238,9 +240,38 @@ public partial class PageSetupUpdate : IPageView
             Config.Update.UpdateMode = (LauncherAutoUpdateBehavior)ComboSystemUpdateMode.SelectedIndex;
     }
 
-    private void BtnChangelog_Click(object sender, MouseButtonEventArgs e)
+    private async void BtnChangelog_Click(object sender, MouseButtonEventArgs e)
     {
-        Common.OpenWebsite("https://github.com/PCL-Community/PCL2-CE/releases/v" + Common.VersionBaseName);
+        // 更新日志改为从云端获取（apiv2/updateinfo.json 的 changelog 字段），不再跳转 GitHub
+        BtnChangelog.IsEnabled = false;
+        try
+        {
+            var changelog = await Task.Run(() => UpdateManager.FetchCloudChangelog());
+            if (string.IsNullOrWhiteSpace(changelog))
+                await _vm.Dialog.ShowAsync(new TextDialogRequest
+                {
+                    Title = Lang.Text("Setup.Update.Changelog.Title"),
+                    Content = Lang.Text("Setup.Update.Changelog.Unavailable"),
+                    Buttons = DialogButtons.Ok
+                });
+            else
+                _vm.Dialog.Show(new MarkdownDialogRequest
+                {
+                    Title = Lang.Text("Setup.Update.Changelog.Title"),
+                    Content = changelog,
+                    Buttons = DialogButtons.Ok,
+                    ForceWait = true
+                });
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, "获取云端更新日志失败", Common.LogLevel.Hint,
+                userSummary: Lang.Text("Setup.Update.Error.NetworkFailed"));
+        }
+        finally
+        {
+            BtnChangelog.IsEnabled = true;
+        }
     }
 
     public string VersionNameFormat(string str) => PageSetupUpdateViewModel.VersionNameFormat(str);
