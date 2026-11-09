@@ -2472,9 +2472,6 @@
     <sys:String x:Key="Setup.About.OriginalAuthor.Name">龙腾猫跃</sys:String>
     <sys:String x:Key="Setup.About.SourceCode">查看源代码</sys:String>
     <sys:String x:Key="Setup.About.SponsorOriginalAuthor">赞助原作者</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Name">本项目</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Info">PCLCE-NS 的开源项目仓库！</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Open">查看仓库</sys:String>
     <sys:String x:Key="Setup.About.Title">关于</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.CopyrightText">Copyright © 龙腾猫跃 2016. All Rights Reserved.&#xD;计算机软件著作权登记号：2020SR0875133&#xD;违法违规行为举报投诉邮箱：hexdragon@vip.qq.com&#xD;非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.OpenSource">开源代码</sys:String>
@@ -3143,7 +3140,7 @@
     <sys:String x:Key="Setup.Update.Changelog.Title">关于此更新</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.Unavailable">没有可用的更新日志...</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.View">查看更新日志</sys:String>
-    <sys:String x:Key="Setup.Update.CheckAgain">再次检查</sys:String>
+    <sys:String x:Key="Setup.Update.Check">检查更新</sys:String>
     <sys:String x:Key="Setup.Update.CheckFailed">检查更新时出错</sys:String>
     <sys:String x:Key="Setup.Update.Checking">正在检查更新...</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 10 运行时</sys:String>
@@ -3170,25 +3167,11 @@
 
     <!-- Setup.Update.Channel -->
 
-    <sys:String x:Key="Setup.Update.Channel.Beta">测试版 / Beta</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Beta.ToolTip">可能不稳定的测试版本，将会进行功能的早期测试，适合希望帮助测试且有一定技术能力的用户使用。</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Beta.Warning.Message">你正在切换启动器更新通道到测试版。&#xA;测试版可以提供下个版本更新内容的预览，但可能会包含未经充分测试的功能，稳定性欠佳。&#xA;&#xA;在升级到测试版后，你需要等待下一个正式版发布，或是手动重新下载启动器来切换到正式版。&#xA;该选项仅推荐具有一定基础知识和能力的用户选择。如果你正在制作整合包，请使用正式版！</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Common.Warning.Confirm">我已知晓</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Common.Warning.Title">继续之前...</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Release">正式版 / Release</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Release.ToolTip">较为稳定的版本，仅推送修复性更新与部分内置资源更新，适合大多数用户使用。</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Title">更新通道</sys:String>
 
-    <!-- Setup.Update.Channel.Dev -->
 
-    <sys:String x:Key="Setup.Update.Channel.Dev">开发版 / Dev</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.ExpectedInput">我确认切换到此分支并已知晓风险</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Message">你确定要切换到开发版通道吗？&#xA;开发版可能存在严重问题，甚至无法启动！&#xA;&#xA;在升级到开发版后，将无法切换回其他任何更新通道，只能手动重新下载启动器来切换回正式版或测试版。&#xA;&#xA;该选项仅推荐高级用户选择。如果你正在制作整合包，请使用正式版！&#xA;请输入 '{0}' 以确认。</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Submit">提交</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Title">最终确认</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.WrongInput">你输入了错误的内容...</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.ToolTip">可能极不稳定的开发版本，直接从最新源代码构建，适合高度技术性用户。&#xA;可能需要具备较好的互联网连接质量才能顺利获取此通道更新。</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.Warning.Message">你正在切换启动器更新通道到开发版。&#xA;该通道可第一时间获取基于最新代码构建的开发版本，但可能极不稳定，甚至直接无法启动。&#xA;&#xA;在升级到开发版后，只能手动重新下载启动器来切换回正式版或测试版。&#xA;该选项仅推荐高级用户选择。如果你正在制作整合包，请使用正式版！</sys:String>
 
     <!-- Speed -->
 

@@ -25,7 +25,6 @@
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
-                        <RowDefinition Height="45" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="40" />
@@ -105,31 +104,6 @@
                         local:CustomEventService.EventData="https://github.com/Havesten/PCL-CE"
                         local:CustomEventService.EventType="OpenUrl"
                         Text="{loc:Loc Setup.About.SourceCode}" />
-                    <local:MyListItem
-                        Grid.Row="3"
-                        Grid.Column="1"
-                        Margin="-5,0,15,0"
-                        Info="{loc:Loc Setup.About.ThisProject.Info}"
-                        IsHitTestVisible="False"
-                        Title="{loc:Loc Setup.About.ThisProject.Name}" />
-                    <Image
-                        Grid.Row="3"
-                        Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/Logo-CE.png">
-                        <Image.Clip>
-                            <EllipseGeometry
-                                Center="17 17"
-                                RadiusX="17"
-                                RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <local:MyButton
-                        Grid.Row="3"
-                        Grid.Column="2"
-                        Height="35"
-                        local:CustomEventService.EventData="https://github.com/Havesten/PCL-CE"
-                        local:CustomEventService.EventType="OpenUrl"
-                        Text="{loc:Loc Setup.About.ThisProject.Open}" />
                 </Grid>
             </local:MyCard>
             <local:MyCard

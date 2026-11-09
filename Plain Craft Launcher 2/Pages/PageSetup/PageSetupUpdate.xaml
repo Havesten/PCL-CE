@@ -25,16 +25,9 @@
                         <TextBlock Text="{loc:Loc Setup.Update.Channel.Title}" Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
                                    Margin="0,0,25,0" />
                         <local:MyComboBox x:Name="ComboSystemUpdateChannel" Tag="SystemUpdateChannel" Grid.Column="1"
-                                          Grid.ColumnSpan="3" Grid.Row="0"
-                                          IsEnabled="{Binding ChannelEnabled, Mode=OneWay}"
-                                          SelectionChanged="ComboSystemUpdateBranch_SelectionChanged">
+                                          Grid.ColumnSpan="3" Grid.Row="0">
                             <local:MyComboBoxItem Content="{loc:Loc Setup.Update.Channel.Release}"
                                                   ToolTip="{loc:Loc Setup.Update.Channel.Release.ToolTip}" />
-                            <local:MyComboBoxItem Content="{loc:Loc Setup.Update.Channel.Beta}"
-                                                  ToolTip="{loc:Loc Setup.Update.Channel.Beta.ToolTip}" />
-                            <local:MyComboBoxItem Content="{loc:Loc Setup.Update.Channel.Dev}"
-                                                  ToolTip="{loc:Loc Setup.Update.Channel.Dev.ToolTip}"
-                                                  Visibility="Collapsed" />
                         </local:MyComboBox>
                         <TextBlock Text="{loc:Loc Setup.Update.Auto.Title}" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left"
                                    Margin="0,0,25,0" />
@@ -113,7 +106,7 @@
                                    Grid.Row="0" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
                         <TextBlock x:Name="TextCurrentDesc" Text="{Binding CurrentDescText, Mode=OneWay}" FontSize="14" Grid.Row="2" Grid.Column="2"
                                    HorizontalAlignment="Left" VerticalAlignment="Top" />
-                        <local:MyButton x:Name="BtnCheckAgain" Text="{loc:Loc Setup.Update.CheckAgain}" ColorType="Highlight" Grid.Row="0" IsEnabled="{Binding CheckAgainEnabled, Mode=OneWay}"
+                        <local:MyButton x:Name="BtnCheckAgain" Text="{loc:Loc Setup.Update.Check}" ColorType="Highlight" Grid.Row="0" IsEnabled="{Binding CheckAgainEnabled, Mode=OneWay}"
                                         Grid.RowSpan="2" Grid.Column="3" HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch" Click="BtnCheckAgain_OnClick" />
                         <local:MyButton x:Name="BtnChangelog" Text="{loc:Loc Setup.Update.Changelog.View}" ColorType="Normal" Grid.Row="0"

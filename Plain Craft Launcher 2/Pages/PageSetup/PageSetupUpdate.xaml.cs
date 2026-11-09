@@ -4,7 +4,6 @@ using System.Windows.Input;
 using PCL.Core.App;
 using PCL.Core.Utils;
 using PCL.Core.App.Localization;
-using PCL.Core.UI.Hints;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.Utils.OS;
 
@@ -48,17 +47,24 @@ public partial class PageSetupUpdate : IPageView
     {
         Animations.AniBeginControl();
 
-        ComboSystemUpdateChannel.SelectedIndex = (int)Config.Update.UpdateChannel;
+        // beta 更新渠道已移除，固定使用正式版
+        Config.Update.UpdateChannel = Core.App.UpdateChannel.Release;
+        ComboSystemUpdateChannel.SelectedIndex = 0;
         ComboSystemUpdateMode.SelectedIndex = (int)Config.Update.UpdateMode;
 
         _vm.Reload();
         Animations.AniEndControl();
 
-        // 在线服务禁用时不自动请求更新源，用户仍可手动点击「检查更新」
+        // 在线服务禁用时不自动请求更新源，但仍显示当前版本与「检查更新」按钮供手动检查
         if (UpdateManager.OnlineServiceEnabled)
+        {
             CheckUpdate();
+        }
         else
+        {
+            _vm.ShowCheckCard = true;
             Common.Log("[Update] 在线服务已禁用，更新页跳过自动检查");
+        }
     }
 
     private async Task<UpdateStatus> IsLatestAsync()
@@ -230,101 +236,6 @@ public partial class PageSetupUpdate : IPageView
     {
         if (!Animations.AniExitsAnyControl())
             Config.Update.UpdateMode = (LauncherAutoUpdateBehavior)ComboSystemUpdateMode.SelectedIndex;
-    }
-
-    private async void ComboSystemUpdateBranch_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        _vm.ChannelEnabled = false;
-        try
-        {
-            if (Animations.AniExitsAnyControl())
-                return;
-
-            var isCancelled = false;
-            switch (ComboSystemUpdateChannel.SelectedIndex)
-            {
-                case 0:
-                {
-                    break;
-                }
-                case 1:
-                {
-                    if ((await _vm.Dialog.ShowAsync(new TextDialogRequest
-                    {
-                        Title = Lang.Text("Setup.Update.Channel.Common.Warning.Title"),
-                        Content = Lang.Text("Setup.Update.Channel.Beta.Warning.Message"),
-                        Buttons = DialogButtons.From(
-                            DialogButton.Create(Lang.Text("Setup.Update.Channel.Common.Warning.Confirm")),
-                            DialogButton.Create(Lang.Text("Common.Action.Cancel"))),
-                        IsWarn = true
-                    })).Button == 2)
-                        isCancelled = true;
-                    else
-                        CheckUpdate();
-                    break;
-                }
-                case 2:
-                {
-                    if ((await _vm.Dialog.ShowAsync(new TextDialogRequest
-                    {
-                        Title = Lang.Text("Setup.Update.Channel.Common.Warning.Title"),
-                        Content = Lang.Text("Setup.Update.Channel.Dev.Warning.Message"),
-                        Buttons = DialogButtons.From(
-                            DialogButton.Create(Lang.Text("Setup.Update.Channel.Common.Warning.Confirm")),
-                            DialogButton.Create(Lang.Text("Common.Action.Cancel"))),
-                        IsWarn = true
-                    })).Button == 2)
-                    {
-                        isCancelled = true;
-                        break;
-                    }
-
-                    var confirmText = Lang.Text("Setup.Update.Channel.Dev.FinalConfirm.ExpectedInput");
-                    var retDialog = await _vm.Dialog.ShowAsync(new InputDialogRequest
-                    {
-                        Title = Lang.Text("Setup.Update.Channel.Dev.FinalConfirm.Title"),
-                        Content = Lang.Text("Setup.Update.Channel.Dev.FinalConfirm.Message", confirmText),
-                        Buttons = DialogButtons.From(
-                            DialogButton.Create(Lang.Text("Setup.Update.Channel.Dev.FinalConfirm.Submit")),
-                            DialogButton.Create(Lang.Text("Common.Action.Cancel"))),
-                        IsWarn = true,
-                        HighLight = false
-                    });
-                    var ret = retDialog.IsConfirmed ? retDialog.InputText : null;
-
-                    if (ret == confirmText)
-                    {
-                        CheckUpdate();
-                    }
-                    else
-                    {
-                        HintService.Show(Hints.Info(Lang.Text("Setup.Update.Channel.Dev.FinalConfirm.WrongInput")));
-                        isCancelled = true;
-                    }
-                    break;
-                }
-            }
-
-            if (isCancelled)
-            {
-                Animations.AniBeginControl();
-                ComboSystemUpdateChannel.SelectedItem = e.RemovedItems[0];
-                Animations.AniEndControl();
-            }
-            else
-            {
-                Config.Update.UpdateChannel = (Core.App.UpdateChannel)ComboSystemUpdateChannel.SelectedIndex;
-            }
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "切换更新通道失败", Common.LogLevel.Feedback,
-                userSummary: Lang.Text("Setup.Error.OperationFailed"));
-        }
-        finally
-        {
-            _vm.ChannelEnabled = true;
-        }
     }
 
     private void BtnChangelog_Click(object sender, MouseButtonEventArgs e)

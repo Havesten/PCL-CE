@@ -8,8 +8,6 @@ namespace PCL;
 /// <summary>设置页面中「更新」页的视图模型。</summary>
 public partial class PageSetupUpdateViewModel : ViewModelBase
 {
-    [ObservableProperty] private bool _channelEnabled = true;
-
     [ObservableProperty] private bool _checkAgainEnabled = true;
 
     [ObservableProperty] private bool _changelogDetailEnabled = true;

@@ -2472,9 +2472,6 @@
     <sys:String x:Key="Setup.About.OriginalAuthor.Name">LTCat (龙腾猫跃)</sys:String>
     <sys:String x:Key="Setup.About.SourceCode">Source code</sys:String>
     <sys:String x:Key="Setup.About.SponsorOriginalAuthor">Sponsor original author</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Name">This project</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Info">The open-source repository of PCLCE-NS!</sys:String>
-    <sys:String x:Key="Setup.About.ThisProject.Open">View repository</sys:String>
     <sys:String x:Key="Setup.About.Title">About</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.CopyrightText">Copyright © 龙腾猫跃 2016. All Rights Reserved.&#xD;Computer Software Copyright Registration No.: 2020SR0875133&#xD;Report violations to: hexdragon@vip.qq.com&#xD;NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</sys:String>
     <sys:String x:Key="Setup.About.UpstreamLegal.OpenSource">Source code</sys:String>
@@ -3143,7 +3140,7 @@
     <sys:String x:Key="Setup.Update.Changelog.Title">About this update</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.Unavailable">No changelog available...</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.View">Full changelog</sys:String>
-    <sys:String x:Key="Setup.Update.CheckAgain">Check again</sys:String>
+    <sys:String x:Key="Setup.Update.Check">Check for updates</sys:String>
     <sys:String x:Key="Setup.Update.CheckFailed">Failed to check for updates</sys:String>
     <sys:String x:Key="Setup.Update.Checking">Checking for updates...</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 10 Runtime</sys:String>
@@ -3170,25 +3167,11 @@
 
     <!-- Setup.Update.Channel -->
 
-    <sys:String x:Key="Setup.Update.Channel.Beta">Beta</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Beta.ToolTip">Potentially unstable beta versions for early feature testing. Suitable for users who want to help test and have some technical ability.</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Beta.Warning.Message">You are switching the launcher update channel to Beta.&#xA;Beta versions provide previews of upcoming updates, but may include insufficiently tested features and have reduced stability.&#xA;&#xA;After upgrading to Beta, you will need to wait for the next Release version or manually re-download the launcher to switch back to Release.&#xA;This option is only recommended for users with some basic knowledge and ability. If you are creating a modpack, please use the Release version!</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Common.Warning.Confirm">I understand</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Common.Warning.Title">Before continuing...</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Release">Release</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Release.ToolTip">A relatively stable version that only receives bug fixes and some built-in resource updates. Suitable for most users.</sys:String>
     <sys:String x:Key="Setup.Update.Channel.Title">Update channel</sys:String>
 
-    <!-- Setup.Update.Channel.Dev -->
 
-    <sys:String x:Key="Setup.Update.Channel.Dev">Dev</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.ExpectedInput">I confirm switching to this branch and am aware of the risks</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Message">Are you sure you want to switch to the Dev channel?&#xA;Dev versions may have serious issues or even fail to launch!&#xA;&#xA;After upgrading to Dev, you will not be able to switch back to any other update channel without manually re-downloading the launcher.&#xA;&#xA;This option is only recommended for advanced users. If you are creating a modpack, please use the Release version!&#xA;Please enter "{0}" to confirm.</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Submit">Submit</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.Title">Final confirmation</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.FinalConfirm.WrongInput">The content you entered is incorrect...</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.ToolTip">Potentially highly unstable development versions built directly from the latest source code. Suitable for highly technical users.&#xA;Good internet connectivity may be required to download updates from this channel.</sys:String>
-    <sys:String x:Key="Setup.Update.Channel.Dev.Warning.Message">You are switching the launcher update channel to Dev.&#xA;This channel provides early access to development builds from the latest code, but may be extremely unstable or even fail to launch.&#xA;&#xA;After upgrading to Dev, you can only manually re-download the launcher to switch back to Release or Beta.&#xA;This option is only recommended for advanced users. If you are creating a modpack, please use the Release version!</sys:String>
 
     <!-- Speed -->
 
