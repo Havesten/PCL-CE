@@ -373,7 +373,8 @@ public static partial class Common
         if (!UpdateManager.OnlineServiceEnabled)
             return false;
 
-        var status = UpdateManager.GetVersionStatus();
+        // 只读缓存：这个入口在 UI 线程被点击调用，不能为了判版本发同步请求
+        var status = UpdateManager.CachedVersionStatus;
 
         if (status == UpdateEnums.VersionStatus.Latest)
             return true;

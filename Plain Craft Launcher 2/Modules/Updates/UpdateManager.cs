@@ -14,6 +14,22 @@ public static class UpdateManager
 {
     public static bool isUpdateWaitingRestart;
 
+    private static UpdateEnums.VersionStatus _cachedStatus = UpdateEnums.VersionStatus.Unknown;
+    private static DateTime _cachedStatusAt = DateTime.MinValue;
+
+    /// <summary>
+    ///     最近一次算出的版本状态，只读缓存、不发请求。
+    ///     <para>
+    ///         界面上的「是否支持反馈」「关于页版本提示」都用它：这些地方在 UI 线程执行，
+    ///         直接调 <see cref="GetVersionStatus" /> 会在网络慢时把界面卡住几十秒。
+    ///         缓存由启动时的后台检查填充。
+    ///     </para>
+    /// </summary>
+    public static UpdateEnums.VersionStatus CachedVersionStatus => _cachedStatus;
+
+    /// <summary>缓存时间，用于判断是否需要重新计算。</summary>
+    public static DateTime CachedVersionStatusAt => _cachedStatusAt;
+
     /// <summary>
     ///     更新源。目前只指向自建服务（cloud/pcl-cloud），不再向社区公共源发起请求。
     ///     <para>
@@ -40,7 +56,8 @@ public static class UpdateManager
     /// </summary>
     public static string FetchCloudChangelog()
     {
-        _cloudSource.RefreshCache();
+        // 用户主动点「查看更新日志」，绕开 60 秒缓存，保证看到的是刚发布的版本
+        _cloudSource.RefreshCache(true);
         return _cloudSource.Changelog;
     }
 
@@ -78,6 +95,18 @@ public static class UpdateManager
     }
     
     public static UpdateEnums.VersionStatus GetVersionStatus()
+    {
+        var status = ComputeVersionStatus();
+        _cachedStatus = status;
+        _cachedStatusAt = DateTime.Now;
+        return status;
+    }
+
+    /// <summary>
+    ///     真正发请求算版本状态。调用方必须在后台线程，或接受被网络阻塞的风险；
+    ///     UI 线程请改用 <see cref="CachedVersionStatus" />。
+    /// </summary>
+    private static UpdateEnums.VersionStatus ComputeVersionStatus()
     {
         // 在线服务关闭时没有版本元数据可用，直接给出「未知」，避免误报「启动器已过期」
         if (!OnlineServiceEnabled) return UpdateEnums.VersionStatus.Unknown;
@@ -120,9 +149,18 @@ public static class UpdateManager
     
     public static Loading.LoaderCombo<JsonObject> updateLoader;
 
+    /// <summary>
+    ///     下载好的新版本临时位置。放在 PCL\Update\ 下而不是安装目录根，
+    ///     既不会和用户手动放的 exe 混淆，也和目标文件同盘，替换时是移动而非跨盘拷贝。
+    /// </summary>
+    public static string UpdatePackagePath =>
+        Path.Combine(Common.ExePath, "PCL", "Update", "PCLCE-NS-update.exe");
+
+    /// <summary>自替换器副本。由当前进程复制自身得到，不随版本变化。</summary>
+    private static string UpdaterPath => Path.Combine(Common.ExePath, "PCL", "Update", "Updater.exe");
+
     public static void UpdateStart(UpdateEnums.UpdateType type, string receivedKey = null, bool forceValidated = false)
     {
-        var dlTargetPath = Common.ExePath + @"PCL\Plain Craft Launcher Community Edition.exe";
         Common.RunInNewThread(() =>
         {
             var effectiveType = type;
@@ -139,12 +177,11 @@ public static class UpdateManager
                 if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
                     return;
 
-                // 强制更新（云端「是否强制更新」或低于「强制最低版本」）不允许跳过：
-                // 即使更新设置为「仅提示」，也直接下载并安装。
-                effectiveType = type;
-                if (type == UpdateEnums.UpdateType.PromptOnly && IsForceRequired(version))
+                // 强制更新（云端「是否强制更新」或低于「强制最低版本」）不允许跳过，
+                // 也不弹询问框：直接下载 → 替换 → 重启，用户下次看到的就是新版本。
+                if (IsForceRequired(version))
                 {
-                    Common.Log("[Update] 命中强制更新，跳过询问直接下载安装");
+                    Common.Log("[Update] 命中强制更新，跳过询问直接下载并替换");
                     effectiveType = UpdateEnums.UpdateType.UpdateNow;
                 }
 
@@ -168,6 +205,10 @@ public static class UpdateManager
                     return;
                     // 构造步骤加载器
                 }
+
+                var dlTargetPath = UpdatePackagePath;
+                var dlDir = Path.GetDirectoryName(dlTargetPath);
+                if (!string.IsNullOrEmpty(dlDir)) Directory.CreateDirectory(dlDir);
 
                 var loaders = new List<Loading.LoaderBase>();
                 // 下载
@@ -249,25 +290,29 @@ public static class UpdateManager
     {
         try
         {
-            var fileName = Common.ExePath + @"PCL\Plain Craft Launcher Community Edition.exe";
-            if (!File.Exists(fileName))
+            var source = UpdatePackagePath;
+            if (!File.Exists(source))
             {
-                Common.Log("[System] 更新失败：未找到更新文件");
+                Common.Log("[System] 更新失败：未找到已下载的更新文件 " + source);
                 return;
             }
 
-            // id old new restart
-            var text =
-                $"update {Process.GetCurrentProcess().Id} \"{Basics.ExecutablePath}\" \"{fileName}\" {(triggerRestart ? "true" : "false")}";
-            Common.Log("[System] 更新程序启动，参数：" + text);
-            Process.Start(new ProcessStartInfo(fileName)
-                { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, Arguments = text });
-            if (triggerRestartAndByEnd)
+            var updater = PrepareUpdater();
+            // 由更新器完成真正的替换：它等本进程退出后才动手，避免覆盖正在运行的文件
+            var args =
+                $"--apply-update {Environment.ProcessId} \"{Basics.ExecutablePath}\" \"{source}\" {(triggerRestart ? "1" : "0")}";
+            Common.Log("[System] 启动自更新器，参数：" + args);
+            Process.Start(new ProcessStartInfo(updater)
             {
-                Launcher.frmMain.EndProgram(false, true);
-                Common.Log("[System] 已由于更新强制结束程序");
-            }
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                WorkingDirectory = Path.GetDirectoryName(updater) ?? Common.ExePath,
+                Arguments = args
+            });
+            if (triggerRestartAndByEnd) ShutdownForUpdate();
         }
+
         catch (Win32Exception ex)
         {
             Common.Log(ex, "自动更新时触发 Win32 错误，疑似被拦截");
@@ -280,6 +325,54 @@ public static class UpdateManager
                 ForceWait = true
             });
         }
+    }
+
+    /// <summary>
+    ///     准备自更新器：把当前 exe 复制一份到 PCL\Update\ 下。
+    ///     更新器必须是「当前版本」的副本，这样它的 --apply-update 逻辑一定存在，
+    ///     不依赖新版本是否支持该参数。
+    /// </summary>
+    private static string PrepareUpdater()
+    {
+        var updater = UpdaterPath;
+        var dir = Path.GetDirectoryName(updater);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        try
+        {
+            File.Copy(Basics.ExecutablePath, updater, true);
+            return updater;
+        }
+
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 上一轮残留的更新器可能还被占用，换个名字绕开
+            Common.Log(ex, "[System] 更新器副本被占用，改用临时名字");
+            var alternative = Path.Combine(dir ?? Common.ExePath,
+                $"Updater-{DateTime.Now:HHmmss}.exe");
+            File.Copy(Basics.ExecutablePath, alternative, true);
+            return alternative;
+        }
+    }
+
+    /// <summary>更新前退出：优先走正常退出流程（保存配置），窗体还没建好时直接结束进程。</summary>
+    private static void ShutdownForUpdate()
+    {
+        try
+        {
+            if (Launcher.frmMain is not null)
+            {
+                Launcher.frmMain.EndProgram(false, true);
+                Common.Log("[System] 已由于更新强制结束程序");
+                return;
+            }
+        }
+
+        catch (Exception ex)
+        {
+            Common.Log(ex, "[System] 更新退出时出错，改为直接结束进程");
+        }
+
+        Environment.Exit(0);
     }
 
     /// <summary>
@@ -331,6 +424,23 @@ public static class UpdateManager
             return;
         }
 
+        // 强制更新优先：命中就直接下载替换，不再等用户点按钮；
+        // 此时也不需要再走常规的「提示/自动下载」调度，避免重复检查与弹窗打架。
+        if (CheckForceUpdate()) return;
+
+        // 把版本状态算一次放进缓存，界面（反馈入口、关于页）直接读缓存，
+        // 不再为了显示一行文字在 UI 线程发同步请求。
+        try
+        {
+            _cachedStatus = GetVersionStatus();
+            _cachedStatusAt = DateTime.Now;
+        }
+
+        catch (Exception ex)
+        {
+            Common.Log(ex, "[Update] 预取版本状态失败");
+        }
+
         ScheduleBasedOnConfig();
         AnnouncementService.Load();
     }
@@ -353,9 +463,8 @@ public static class UpdateManager
                 UpdateStart(UpdateEnums.UpdateType.PromptOnly);
                 break;
             default:
+                // 强制更新已在启动时优先检查过（见 LoadOnlineInfo），这里不再重复请求
                 Common.Log("[Update] 更新设置: 不自动检查更新");
-                // 强制更新不受「不自动检查更新」设置影响
-                CheckForceUpdate();
                 return;
         }
     }
@@ -363,8 +472,9 @@ public static class UpdateManager
     /// <summary>
     ///     仅执行强制更新检查：不打扰普通用户，
     ///     但命中云端「是否强制更新」或「强制最低版本」时必须更新。
+    ///     命中后会直接开始下载并替换，返回 true 表示已进入更新流程。
     /// </summary>
-    private static void CheckForceUpdate()
+    private static bool CheckForceUpdate()
     {
         try
         {
@@ -372,15 +482,18 @@ public static class UpdateManager
                 IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
                 SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64);
             if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
-                return;
+                return false;
             if (!IsForceRequired(version))
-                return;
-            Common.Log("[Update] 命中强制更新，不受「不自动检查更新」设置影响");
-            UpdateStart(UpdateEnums.UpdateType.PromptOnly);
+                return false;
+            Common.Log("[Update] 命中强制更新，不受「不自动检查更新」设置影响，开始静默下载替换");
+            UpdateStart(UpdateEnums.UpdateType.UpdateNow);
+            return true;
         }
+
         catch (Exception ex)
         {
             Common.Log(ex, "[Update] 强制更新检查失败");
+            return false;
         }
     }
 }

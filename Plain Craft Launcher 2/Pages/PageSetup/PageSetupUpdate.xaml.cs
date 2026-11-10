@@ -103,10 +103,12 @@ public partial class PageSetupUpdate : IPageView
                 Exception checkUpdateEx = null;
                 try
                 {
-                    updateInfo = UpdateManager.remoteServer.GetLatestVersion(
+                    // 版本信息可能还没缓存（启动检查未完成），GetLatestVersion 会同步发请求，
+                    // 必须放到后台线程，否则网络慢时整个设置页会卡住不响应。
+                    updateInfo = await Task.Run(() => UpdateManager.remoteServer.GetLatestVersion(
                         UpdateManager.IsCurrentVersionBeta
                             ? UpdateChannel.beta
-                            : UpdateChannel.stable, SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64);
+                            : UpdateChannel.stable, SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64));
                     _vm.UpdateNameText = "PCLCE-NS " + VersionNameFormat(updateInfo.VersionName);
                     // 云端更新日志为纯文本/Markdown；旧清单格式用 <summary> 包裹摘要
                     var changelog = updateInfo.Changelog ?? "";
@@ -186,12 +188,16 @@ public partial class PageSetupUpdate : IPageView
         }
     }
 
-    public void BtnUpdate_Timer()
+    /// <summary>
+    ///     下载进度轮询。这里必须用 await Task.Delay 而不是 Thread.Sleep：
+    ///     后者会占死 UI 线程，下载期间整页（包括窗口本身）完全无响应。
+    /// </summary>
+    public async void BtnUpdate_Timer()
     {
-        while (UpdateManager.updateLoader is not null && UpdateManager.updateLoader.State == Common.LoadState.Loading)
+        while (UpdateManager.updateLoader is { State: Common.LoadState.Loading })
         {
-            Common.RunInUi(() => BtnUpdate.Text = Lang.Number(UpdateManager.updateLoader.Progress, "P2"));
-            Thread.Sleep(200);
+            BtnUpdate.Text = Lang.Number(UpdateManager.updateLoader.Progress, "P2");
+            await Task.Delay(200);
         }
     }
 

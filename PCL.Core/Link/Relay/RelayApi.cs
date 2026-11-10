@@ -17,7 +17,7 @@ namespace PCL.Core.Link.Relay;
 public sealed class RelayApi
 {
     /// <summary>默认的云端根地址。与更新源共用 <see cref="CloudEndpoints.ApiRoot" />，路径前缀 /api/v1。</summary>
-    private const string DefaultBaseUrl = CloudEndpoints.ApiRoot;
+    private static readonly string DefaultBaseUrl = CloudEndpoints.ApiRoot;
 
     /// <summary>
     ///     云端根地址。设置环境变量 <c>PCL_RELAY_API</c> 可以指向本地或自建服务，便于联调。
@@ -30,7 +30,9 @@ public sealed class RelayApi
         return string.IsNullOrWhiteSpace(fromEnv) ? DefaultBaseUrl : fromEnv.TrimEnd('/');
     }
 
-    private readonly HttpClient _client = NetworkService.GetClient();
+    // 用专用的短超时客户端（12 秒），而不是全局默认客户端的 100 秒：
+    // 联机页在切换时就会发几个请求，超时太长会让整页像「卡死」。
+    private readonly HttpClient _client = NetworkService.GetClient(NetworkService.Relay);
 
     /// <summary>
     ///     登录后由 <see cref="RelaySession" /> 注入，所有需鉴权的接口都要带上。

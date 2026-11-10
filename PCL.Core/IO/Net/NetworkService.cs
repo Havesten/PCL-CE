@@ -46,6 +46,12 @@ public partial class NetworkService
 
     public const string Cache = "cache";
 
+    /// <summary>
+    ///     中继联机 API 专用客户端。自有服务正常都是毫秒级返回，
+    ///     用默认的 100 秒超时会让「网络不通」表现为界面长时间无响应。
+    /// </summary>
+    public const string Relay = "relay";
+
     public const string MojangPistonMeta = "mojang_piston";
 
     public const string MojangSession = "mojang_session";
@@ -74,6 +80,10 @@ public partial class NetworkService
         // 默认的 HTTP Client
         
         services.AddHttpClient(Default);
+
+        // 中继联机 API：短超时，网络异常时尽快让界面给出「连不上」而不是干等
+
+        services.AddHttpClient(Relay).ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(12));
         
         // CurseForge
 

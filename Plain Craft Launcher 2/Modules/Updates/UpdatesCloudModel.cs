@@ -18,7 +18,15 @@ namespace PCL;
 /// </summary>
 public class UpdatesCloudModel : IUpdateSource
 {
+    /// <summary>
+    ///     更新信息的请求参数。自建云端正常是毫秒级返回，长超时只会让界面在网络异常时干等：
+    ///     这里压到单次 8 秒、最多 2 次，最坏 16 秒就放弃。
+    /// </summary>
+    private static readonly RequestParam FastRequest = new() { Timeout = 8000, Retries = 2 };
+
     private readonly string _baseUrl;
+    private readonly object _gate = new();
+    private DateTime _fetchedAt = DateTime.MinValue;
 
     private UpdateInfoModel _info;
 
@@ -41,12 +49,41 @@ public class UpdatesCloudModel : IUpdateSource
 
     public bool RefreshCache()
     {
-        var content = Requester.FetchString($"{_baseUrl}apiv2/updateinfo.json", RequestParam.WithRetry);
-        var info = Common.GetJson(content).ToObject<UpdateInfoModel>();
-        if (info is null || string.IsNullOrWhiteSpace(info.LatestVersion))
-            throw new Exception("updateinfo.json 缺少 latest_version 字段！");
-        _info = info;
-        return true;
+        return RefreshCache(false);
+    }
+
+    /// <summary>
+    ///     拉取 updateinfo.json。<paramref name="force" /> 为 false 时 60 秒内复用上次结果，
+    ///     避免「启动检查 + 设置页检查 + 联机页」在同一分钟内各自发一遍请求。
+    /// </summary>
+    public bool RefreshCache(bool force)
+    {
+        lock (_gate)
+        {
+            if (!force && _info is not null && DateTime.Now - _fetchedAt < TimeSpan.FromSeconds(60))
+                return true;
+
+            var url = $"{_baseUrl}apiv2/updateinfo.json";
+            Common.Log("[Update] 拉取更新信息：" + url);
+            try
+            {
+                var content = Requester.FetchString(url, FastRequest);
+                var info = Common.GetJson(content).ToObject<UpdateInfoModel>();
+                if (info is null || string.IsNullOrWhiteSpace(info.LatestVersion))
+                    throw new Exception("updateinfo.json 缺少 latest_version 字段！");
+                _info = info;
+                _fetchedAt = DateTime.Now;
+                Common.Log($"[Update] 更新信息已获取：latest={info.LatestVersion}, force={info.ForceUpdate}");
+                return true;
+            }
+
+            catch (Exception ex)
+            {
+                // 带上地址一起记，排查时才能区分「云端挂了」和「客户端地址配错了」
+                Common.Log(ex, "[Update] 拉取更新信息失败：" + url);
+                throw;
+            }
+        }
     }
 
     public VersionDataModel GetLatestVersion(UpdateChannel channel, UpdateArch arch)

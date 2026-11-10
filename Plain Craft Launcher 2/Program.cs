@@ -15,6 +15,10 @@ internal static class Program
     [STAThread]
     public static void Main()
     {
+        // 自更新落地：本进程若由更新流程以更新器身份启动，只做「等旧进程退出 → 覆盖 exe → 重启」，
+        // 不初始化任何界面。必须放在最前面，此时还没有任何文件句柄占用自身。
+        if (UpdateApplier.TryApply()) return;
+
         if (Basics.CommandLineArguments.Contains("--console")) KernelInterop.AllocateConsole();
 #if DEBUG
         if (Basics.CommandLineArguments.Contains("--debug"))

@@ -1,3 +1,5 @@
+using System;
+
 namespace PCL.Core.App;
 
 /// <summary>
@@ -10,11 +12,27 @@ namespace PCL.Core.App;
 /// </summary>
 public static class CloudEndpoints
 {
-    /// <summary>API 根地址，不带结尾斜杠。</summary>
-    public const string ApiRoot = "https://api.fuukir.cn/pclce-api";
+    private const string DefaultApiRoot = "https://api.fuukir.cn/pclce-api";
+
+    /// <summary>
+    ///     API 根地址，不带结尾斜杠。
+    ///     <para>
+    ///         设置环境变量 <c>PCL_CLOUD_API</c> 可临时指向本地或测试服务
+    ///         （例如联调强制更新时指向 <c>http://127.0.0.1:18080</c>），
+    ///         未设置时使用生产地址，与 <see cref="PCL.Core.Link.Relay.RelayApi" /> 的
+    ///         <c>PCL_RELAY_API</c> 是同一套约定。
+    ///     </para>
+    /// </summary>
+    public static string ApiRoot { get; } = ResolveApiRoot();
 
     /// <summary>
     ///     更新源基地址。更新模块拼接的是 <c>{基地址}apiv2/...</c>，所以这里必须带结尾斜杠。
     /// </summary>
-    public const string UpdateRoot = ApiRoot + "/";
+    public static string UpdateRoot => ApiRoot + "/";
+
+    private static string ResolveApiRoot()
+    {
+        var custom = Environment.GetEnvironmentVariable("PCL_CLOUD_API");
+        return string.IsNullOrWhiteSpace(custom) ? DefaultApiRoot : custom.Trim().TrimEnd('/');
+    }
 }

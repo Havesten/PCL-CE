@@ -28,6 +28,7 @@ public partial class RelayPanel : UserControl
     private bool _banned;
     private bool _hasNodes;
     private bool _busy;
+    private bool _refreshing;
     private bool _versionTooLow;
     private RelayMe? _lastMe;
     private bool _phonePrompted;
@@ -65,6 +66,9 @@ public partial class RelayPanel : UserControl
             if (!_initialized)
             {
                 _initialized = true;
+                // 请求期间给个可见反馈，别让页面看起来像卡住了（网络慢时尤其明显）
+                LabEmpty.Text = "正在加载中继配置…";
+                LabEmpty.Visibility = Visibility.Visible;
                 await InitializeAsync().ConfigureAwait(true);
                 return;
             }
@@ -296,16 +300,47 @@ public partial class RelayPanel : UserControl
 
     private async Task RefreshAsync()
     {
-        if (!_session.IsValid) return;
+        // 防重入：60 秒轮询、切页、手动操作都可能触发刷新，
+        // 网络慢时上一次还没回来，再叠一次只会让请求互相拖慢。
+        if (!_session.IsValid || _refreshing) return;
+        _refreshing = true;
         try
         {
-            await CheckVersionAsync().ConfigureAwait(true);
-            var me = await _api.GetMeAsync().ConfigureAwait(true);
+            await RefreshCoreAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        try
+        {
+            // 账号信息与节点列表互不依赖，并行发出去：串行时网络慢就等于把两倍延迟叠起来，
+            // 用户看到的是「切到联机页后一直没反应」。
+            var meTask = _api.GetMeAsync();
+            var nodesTask = _api.GetNodesAsync();
+
+            var me = await meTask.ConfigureAwait(true);
             _lastMe = me;
             ApplyMe(me);
             ApplyQuota(me.Quota);
             ApplyAllocations(me.Allocations);
-            await LoadNodesAsync().ConfigureAwait(true);
+
+            IReadOnlyList<RelayNode> nodes;
+            try
+            {
+                nodes = await nodesTask.ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                nodes = [];
+                SetStatus("获取中继节点失败：" + ex.Message);
+            }
+
+            ApplyNodes(nodes);
         }
         catch (RelayApiException ex) when (ex.Status == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -332,20 +367,8 @@ public partial class RelayPanel : UserControl
         UpdateButtons();
     }
 
-    private async Task LoadNodesAsync()
+    private void ApplyNodes(IReadOnlyList<RelayNode> nodes)
     {
-        IReadOnlyList<RelayNode> nodes;
-        try
-        {
-            nodes = await _api.GetNodesAsync().ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            // 拉不到节点时不能把下拉框留成空白，否则看起来像是页面没渲染出来。
-            nodes = [];
-            SetStatus("获取中继节点失败：" + ex.Message);
-        }
-
         var selected = (ComboNodes.SelectedItem as RelayNode)?.Id;
         if (nodes.Count == 0)
         {
