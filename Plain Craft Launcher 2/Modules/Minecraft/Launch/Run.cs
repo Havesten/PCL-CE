@@ -502,12 +502,27 @@ public static partial class GameLaunch
 
         var jStackPath = Path.Combine(mcLaunchJavaSelected!.Installation.JavaFolder, "jstack.exe");
 
-        var watcher = new GameWatcher.Watcher(
-            loader,
-            InstanceList.McMcInstanceSelected,
-            windowTitle,
-            File.Exists(jStackPath) ? jStackPath : "",
-            currentLaunchOptions!.IsTest);
+        // 游戏进程此时已经启动。监控初始化属于附加能力，
+        // 即使它失败也不应把已经跑起来的游戏判定为「启动失败」。
+        GameWatcher.Watcher? watcher = null;
+        try
+        {
+            watcher = new GameWatcher.Watcher(
+                loader,
+                InstanceList.McMcInstanceSelected,
+                windowTitle,
+                File.Exists(jStackPath) ? jStackPath : "",
+                currentLaunchOptions!.IsTest);
+        }
+        catch (Exception ex)
+        {
+            McLaunchLog("窗口监控初始化失败，已跳过启动完成检测：" + ex.Message);
+            Common.Log(ex, "窗口监控初始化失败", Common.LogLevel.Hint);
+        }
+
+        if (watcher is null)
+            return;
+
         mcLaunchWatcher = watcher;
 
         if (currentLaunchOptions.IsTest)
