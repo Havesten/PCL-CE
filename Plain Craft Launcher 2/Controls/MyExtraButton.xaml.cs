@@ -171,6 +171,13 @@ public partial class MyExtraButton
         get => (bool)GetValue(ShowProperty);
         set
         {
+            // 依赖属性的读写都会触发线程校验，而大量调用点来自后台线程。
+            if (!Dispatcher.CheckAccess())
+            {
+                Common.RunInUi(() => Show = value);
+                return;
+            }
+
             if (Show == value)
                 return;
             SetValue(ShowProperty, value);
@@ -255,8 +262,14 @@ public partial class MyExtraButton
 
     public void ShowRefresh()
     {
-        if (showCheck is not null)
-            Show = showCheck();
+        // Show 是依赖属性，读写都会触发 VerifyAccess；
+        // 该方法绝大多数调用点位于后台线程（安装、下载、联机初始化等），
+        // 因此在 UI 线程统一完成「读取状态 + 赋值」。
+        Common.RunInUi(() =>
+        {
+            if (showCheck is not null)
+                Show = showCheck();
+        });
     }
 
     // 触发点击事件
