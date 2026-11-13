@@ -194,11 +194,10 @@ public static partial class LocalComp
         if (!Directory.Exists(data.compPath))
             return modList;
 
-        var rawName = data.compPath.ToLower();
         if (data.compType == CompType.Schematic)
             EnumerateSchematicResourceFiles(data, modList);
         else
-            EnumerateRegularResourceFiles(data, rawName, modList);
+            EnumerateRegularResourceFiles(data, modList);
 
         return modList;
     }
@@ -242,15 +241,19 @@ public static partial class LocalComp
 
     private static void EnumerateRegularResourceFiles(
         CompLocalLoaderData data,
-        string rawName,
         List<LocalCompFile> modList)
     {
+        // 用与枚举同源的根目录做比较基准：Common.EnumerateFiles 在超长路径下会退化为短路径，
+        // 因此这里也走一次 ShortenPath，保证根路径与枚举出的 DirectoryName 处于同一形态。
+        var root = new DirectoryInfo(Common.ShortenPath(data.compPath));
+        var rootName = root.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
         try
         {
             foreach (var file in Common.EnumerateFiles(data.compPath))
                 try
                 {
-                    if (ShouldSkipResourceFile(file, rawName))
+                    if (ShouldSkipResourceFile(file, rootName))
                         continue;
 
                     if (LocalCompFile.IsCompFile(file.FullName, data.compType))
@@ -267,11 +270,16 @@ public static partial class LocalComp
         }
     }
 
-    private static bool ShouldSkipResourceFile(FileInfo file, string rawName)
+    private static bool ShouldSkipResourceFile(FileInfo file, string rootName)
     {
-        if ((file.DirectoryName ?? "").Equals(rawName, StringComparison.CurrentCultureIgnoreCase))
+        // DirectoryName 不带结尾分隔符，而 compPath 往往以 "\" 结尾；
+        // 两侧统一去除分隔符后再比较，否则根目录下的所有文件都会被误判为子目录文件而跳过。
+        var directoryName = (file.DirectoryName ?? "")
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (directoryName.Equals(rootName, StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // 兼容 Forge 1.12 及更早版本把 Mod 放在版本隔离目录（versions\<版本名>\mods）的情况
         return !(PageInstanceLeft.McInstance is not null
             && PageInstanceLeft.McInstance.Info.HasForge
             && PageInstanceLeft.McInstance.Info.Drop < 130

@@ -485,7 +485,9 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
                            (PageInstanceLeft.McInstance.Info.HasLabyMod
                                ? Path.Combine("labymod-neo", "fabric", PageInstanceLeft.McInstance.Info.VanillaName)
                                : "") + LocalComp.GetPathNameByCompType(_vm.CompType) + @"\";
-            rootPath = Path.GetFullPath(rootPath.TrimEnd('\\'));
+            // 与枚举侧保持同一路径形态：超长路径下 Common.EnumerateFiles 会退化为短路径，
+            // 这里若仍用长路径比较，会导致所有条目都被判定为「不在根目录」而不显示。
+            rootPath = Path.GetFullPath(Common.ShortenPath(rootPath.TrimEnd('\\')));
 
             var itemsToShow = LocalComp.CompResourceListLoader.output.Where(item =>
             {
