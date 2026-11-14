@@ -36,6 +36,7 @@ public partial class PageDownloadCompDetail : IPageView
     private MyCompItem _compItem;
     private bool _isFirstInit = true;
     private bool _refreshed;
+    private Comp.CompProject? _refreshedProject;
 
     public void OnNavigatedTo(object? parameter) => RefreshOnNavigate();
 
@@ -43,8 +44,17 @@ public partial class PageDownloadCompDetail : IPageView
 
     private void RefreshOnNavigate()
     {
-        if (_refreshed) return;
+        // 本页面在 FormMain 中是单例（frmDownloadCompDetail ??= new ...），
+        // 从详情页点「前置资源」跳到另一个详情时，宿主容器的 Child 仍是同一个实例，
+        // 既不会触发 Unloaded 也不会重新 Loaded，仅靠 _refreshed 会一直保持 true，
+        // 导致页面停留在上一个 Mod 上（表现为点击后没反应）。
+        // 因此在标志之外再比对目标工程：工程变了就必须重新初始化。
+        var project = Launcher.frmMain.pageCurrent.additional?.CompProject;
+        if (_refreshed && ReferenceEquals(_refreshedProject, project))
+            return;
+
         _refreshed = true;
+        _refreshedProject = project;
         Init();
     }
 
@@ -712,7 +722,11 @@ public partial class PageDownloadCompDetail : IPageView
         });
         Initialized += PageDownloadCompDetail_Inited;
         Loaded += (_, _) => LoadTargetFromAdditional();
-        Unloaded += (_, _) => _refreshed = false;
+        Unloaded += (_, _) =>
+        {
+            _refreshed = false;
+            _refreshedProject = null;
+        };
         PageEnter += RefreshOnNavigate;
         InitializeComponent();
         DataContext = _vm;
