@@ -37,6 +37,9 @@ public static partial class GameDownload
     {
         var urls = new List<KeyValuePair<string, int>>();
         var mcimUrl = DlSourceModGet(url);
+        // 官方档统一改走自建云端：API Key 只存在服务端，客户端不落地。
+        // 镜像档保持原样，因此「优先镜像」时根本不会触发云端请求。
+        var officialUrl = DlSourceModCloudGet(url);
         if (mcimUrl is not null && mcimUrl != url)
             switch (Config.Download.Comp.CompSourceSolution)
             {
@@ -44,28 +47,28 @@ public static partial class GameDownload
                 {
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 5));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     break;
                 }
                 case 1:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
                     break;
                 }
                 case OfficialOnlySourceValue:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     break;
                 }
 
                 default:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
                     break;
                 }
@@ -122,6 +125,9 @@ public static partial class GameDownload
     {
         var urls = new List<KeyValuePair<string, int>>();
         var mcimUrl = DlSourceModGet(url);
+        // 官方档统一改走自建云端：API Key 只存在服务端，客户端不落地。
+        // 镜像档保持原样，因此「优先镜像」时根本不会触发云端请求。
+        var officialUrl = DlSourceModCloudGet(url);
         if (mcimUrl is not null && mcimUrl != url)
             switch (allowMirror ? Config.Download.Comp.CompSourceSolution : 2)
             {
@@ -129,28 +135,28 @@ public static partial class GameDownload
                 {
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 5));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     break;
                 }
                 case 1:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
                     break;
                 }
                 case OfficialOnlySourceValue:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     break;
                 }
 
                 default:
                 {
-                    urls.Add(new KeyValuePair<string, int>(url, 5));
-                    urls.Add(new KeyValuePair<string, int>(url, 15));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 5));
+                    urls.Add(new KeyValuePair<string, int>(officialUrl, 15));
                     urls.Add(new KeyValuePair<string, int>(mcimUrl, 10));
                     break;
                 }
@@ -352,6 +358,20 @@ public static partial class GameDownload
             .Replace(
                 "https://api.curseforge.com",
                 "https://mod.mcimirror.top/curseforge");
+    }
+
+    /// <summary>
+    ///     把官方 CurseForge 接口地址改写到自建云端。
+    ///     客户端不内置任何 API Key：只有确实要请求官方接口时才交给云端转发，密钥只存在服务端。
+    ///     镜像地址与文件下载都不经过这里，因此优先镜像时不会有额外的云端请求。
+    /// </summary>
+    public static string DlSourceModCloudGet(string original)
+    {
+        const string official = "https://api.curseforge.com";
+        if (string.IsNullOrEmpty(original) ||
+            !original.StartsWith(official, StringComparison.OrdinalIgnoreCase))
+            return original;
+        return CloudEndpoints.ApiRoot + "/cf" + original[official.Length..];
     }
 
     /// <summary>

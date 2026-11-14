@@ -100,7 +100,9 @@ public static partial class Config
             [ConfigItem<bool>("ToolDownloadIgnoreQuilt", true)] public partial bool IgnoreQuilt { get; set; }
             [ConfigItem<bool>("ToolDownloadAutoInstallDependencies", true)] public partial bool AutoInstallDependencies { get; set; }
             [ConfigItem<bool>("ToolDownloadClipboard", false)] public partial bool ReadClipboard { get; set; }
-            [ConfigItem<int>("ToolDownloadMod", 1)] public partial int CompSourceSolution { get; set; }
+            // 默认「使用镜像」：官方接口需要服务端代持密钥，镜像能覆盖绝大多数场景，
+            // 优先走镜像可以少一跳、也少消耗云端配额；镜像失败时仍会自动回落到官方（云端）。
+            [ConfigItem<int>("ToolDownloadMod", 0)] public partial int CompSourceSolution { get; set; }
             [ConfigItem<int>("ToolModLocalNameStyle", 0)] public partial int UiCompNameSolution { get; set; }
             [ConfigItem<int>("ToolDownloadQuickBehavior", 0)] public partial int QuickDownloadBehavior { get; set; }
         }
