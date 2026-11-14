@@ -47,7 +47,9 @@ internal static class UpdateApplier
 
             WaitForExit(parentPid, TimeSpan.FromSeconds(120));
             Replace(target, source);
-            Log("[Update] 替换完成，启动新版本");
+            // 只覆盖调用方传入的路径（启动器传的是 Basics.ExecutablePath，即当前正在运行的那个 exe），
+            // 文件名与所在目录一律不改：用户自定义的程序名、桌面/开始菜单快捷方式继续有效。
+            Log($"[Update] 替换完成，按原文件名保留：{Path.GetFileName(target)}，启动新版本");
             if (restart) StartProgram(target);
         }
 
