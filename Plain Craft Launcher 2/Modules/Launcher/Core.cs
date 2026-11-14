@@ -88,6 +88,15 @@ public static partial class Launcher
         {
             frmMain!.DragTick();
             Loading.LoaderTaskbarProgressRefresh();
+            // 兜底：弹窗已经全部移除、遮罩却还留着时（退场动画被外力打断，控件没从 PanMsg 里摘掉），
+            // 那层透明背景会盖住整个窗口，用户点哪里都没有反应，只能重启启动器。
+            // 没有子元素就说明不该再拦点击，直接收起。
+            if (frmMain.PanMsg.Children.Count == 0 &&
+                frmMain.PanMsgBackground.Visibility != System.Windows.Visibility.Collapsed)
+            {
+                Common.Log("[Control] 检测到残留的弹窗遮罩，已自动收起", Common.LogLevel.Hint);
+                frmMain.PanMsgBackground.Visibility = System.Windows.Visibility.Collapsed;
+            }
         }
         catch (Exception ex)
         {

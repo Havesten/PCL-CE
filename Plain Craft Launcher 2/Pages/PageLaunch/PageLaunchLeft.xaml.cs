@@ -65,9 +65,13 @@ public partial class PageLaunchLeft : IPageView
 
     private static void OnLanguageChanged(PageLaunchLeft page) => Common.RunInUi(page.RefreshButtonsUI);
 
-    // 常驻左侧页面，刷新由 Loaded 完成，导航钩子无需额外动作。
+    // 从其它页面切回启动页时必须重新算一次按钮状态：
+    // PanMainLeft.Child 赋回同一个单例实例时 WPF 既不会触发 Unloaded 也不会重新触发 Loaded，
+    // 若离开期间实例列表加载器进入过 Loading（按钮被置灰），状态就会一直停在禁用上，
+    // 表现为「返回主界面后启动按钮点不动」，只能重启启动器。导航钩子不依赖 Loaded，可兜住这种情况。
     public void OnNavigatedTo(object? parameter)
     {
+        RefreshButtonsUI();
     }
 
     public void OnNavigatedFrom()
@@ -88,8 +92,10 @@ public partial class PageLaunchLeft : IPageView
         Animations.AniBeginControl();
 
         // 开始按钮
-        InstanceList.mcInstanceListLoader.LoadingStateChanged += (_, _) => RefreshButtonsUI();
-        GameFolders.McFolderListLoader.LoadingStateChanged += (_, _) => RefreshButtonsUI();
+        // 加载器状态变化可能来自后台线程，而 RefreshButtonsUI 会写 ViewModel 并触发 WPF 绑定，
+        // 必须切回 UI 线程执行，否则这次状态更新会丢失，按钮就一直停在旧状态。
+        InstanceList.mcInstanceListLoader.LoadingStateChanged += (_, _) => Common.RunInUi(RefreshButtonsUI);
+        GameFolders.McFolderListLoader.LoadingStateChanged += (_, _) => Common.RunInUi(RefreshButtonsUI);
         RefreshButtonsUI();
 
         // 初始化档案
@@ -215,11 +221,30 @@ public partial class PageLaunchLeft : IPageView
     // 启动按钮
     public void LaunchButtonClick()
     {
-        if (GameLaunch.mcLaunchLoader.State == Common.LoadState.Loading || !BtnLaunch.IsEnabled ||
-            (Launcher.frmMain.pageRight is not null &&
-             Launcher.frmMain.pageRight.PageState != MyPageRight.PageStates.ContentStay &&
-             Launcher.frmMain.pageRight.PageState != MyPageRight.PageStates.ContentEnter))
+        // 这几个提前返回不会留下任何痕迹，用户看到的就是「点了没反应」，
+        // 因此逐个记录拦截原因，便于事后从日志判断是哪个条件卡住了。
+        if (GameLaunch.mcLaunchLoader.State == Common.LoadState.Loading)
+        {
+            Common.Log("[Launch] 启动按钮被忽略：已有启动任务在进行中");
             return;
+        }
+
+        if (!BtnLaunch.IsEnabled)
+        {
+            Common.Log("[Launch] 启动按钮被忽略：按钮处于禁用状态（文字：" + _vm.LaunchButtonText +
+                       "，动作：" + Common.GetStringFromEnum(_launchButtonAction) + "）", Common.LogLevel.Hint);
+            return;
+        }
+
+        var rightPage = Launcher.frmMain.pageRight;
+        if (rightPage is not null &&
+            rightPage.PageState != MyPageRight.PageStates.ContentStay &&
+            rightPage.PageState != MyPageRight.PageStates.ContentEnter)
+        {
+            Common.Log("[Launch] 启动按钮被忽略：右侧页面状态为 " + Common.GetStringFromEnum(rightPage.PageState),
+                Common.LogLevel.Hint);
+            return;
+        }
         // 愚人节处理
         if (Launcher.isAprilEnabled && !Launcher.isAprilGiveup)
         {

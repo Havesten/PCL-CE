@@ -100,8 +100,31 @@ public class MyPageRight : AdornerDecorator
         if (finishedInvoke is not null)
             realLoader.PreviewFinish += _ =>
             {
-                while (PageState == PageStates.PageExit || PageState == PageStates.ContentExit)
-                    Thread.Sleep(10); // 不在退出动画时执行 UI 线程操作，避免退出动画被重置
+                // 页面已经离开（退出动画播完或已被强制清空）时，不再往它的控件上刷 UI。
+                // 原实现在这里用 while + Thread.Sleep 无限等待退出动画结束，但页面一旦离开，
+                // PageState 就会长期停在 PageExit/Empty，这个等待永远结束不了；而该回调可能在
+                // UI 线程上执行，于是整个界面被彻底挂死：窗口还在，点哪里都没反应，只能重启启动器。
+                if (PageState is PageStates.PageExit or PageStates.Empty)
+                {
+                    Common.Log("[UI] 页面已离开，跳过加载完成后的界面刷新（状态：" +
+                               Common.GetStringFromEnum(PageState) + "）", Common.LogLevel.Debug);
+                    return;
+                }
+
+                if (PageState == PageStates.ContentExit)
+                {
+                    // 内容正在切换（例如刷新子页面）时短暂等退出动画，避免退出动画被重置；
+                    // 但必须限时，超时同样放弃刷新，绝不无限阻塞 UI 线程。
+                    var deadline = System.Environment.TickCount64 + 800;
+                    while (PageState == PageStates.ContentExit && System.Environment.TickCount64 < deadline)
+                        Thread.Sleep(10);
+                    if (PageState is PageStates.PageExit or PageStates.Empty)
+                    {
+                        Common.Log("[UI] 等待内容退出动画期间页面已离开，跳过界面刷新", Common.LogLevel.Debug);
+                        return;
+                    }
+                }
+
                 Common.RunInUiWait(() => finishedInvoke(realLoader));
                 Thread.Sleep(20); // 由于大量初始化控件会导致掉帧，延迟触发 State 改变事件
             };
