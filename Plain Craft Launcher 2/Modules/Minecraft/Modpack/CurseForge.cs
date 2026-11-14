@@ -332,8 +332,9 @@ public static partial class Modpack
     }
 
     /// <summary>
-    ///     获取单个模组文件的详细信息。优先走镜像：未配置 API Key 时官方源必然返回 403，
+    ///     获取单个模组文件的详细信息。优先走镜像：官方源需要 API Key，
     ///     若逐个查询都先等官方超时，导入过程会被拖得非常慢。
+    ///     真正回落到官方时走自建云端（客户端不内置 Key），由云端注入密钥转发。
     /// </summary>
     private static JsonObject _FetchCurseForgeModFile(CurseForgeModRef modRef)
     {
@@ -356,7 +357,7 @@ public static partial class Modpack
 
         return (JsonObject)Common.GetJson(
             Requester.FetchString(
-                official,
+                GameDownload.DlSourceModCloudGet(official),
                 new RequestParam { Timeout = 15000, Retries = 2, UseBrowserUserAgent = true }));
     }
 
