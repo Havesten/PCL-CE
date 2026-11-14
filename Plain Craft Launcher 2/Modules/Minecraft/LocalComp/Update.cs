@@ -373,13 +373,15 @@ public static partial class LocalComp
         }
 
         var body = $$"""{"fingerprints": [{{string.Join(",", hashes)}}]}""";
+        // 官方指纹接口同样需要 x-api-key，允许回落镜像，否则本地 Mod 无法反查 CurseForge 项目
         var response = (JsonObject)
             Common.GetJson(
                 GameDownload.DlModRequest(
                     "https://api.curseforge.com/v1/fingerprints/432",
                     "POST",
                     body,
-                    "application/json"));
+                    "application/json",
+                    true));
         return response["data"]?["exactMatches"] as JsonArray ?? [];
     }
 
@@ -387,12 +389,14 @@ public static partial class LocalComp
         Dictionary<string, List<LocalCompFile>> curseForgeMapping)
     {
         var body = $$"""{"modIds": [{{string.Join(",", curseForgeMapping.Keys)}}]}""";
+        // 官方批量接口需要 x-api-key，未嵌入密钥时恒 403；允许回落镜像，否则更新检查整条链拿不到数据
         var response = (JsonObject)Common.GetJson(
             GameDownload.DlModRequest(
                 "https://api.curseforge.com/v1/mods",
                 "POST",
                 body,
-                "application/json"));
+                "application/json",
+                true));
         return response["data"] as JsonArray ?? [];
     }
 
@@ -400,12 +404,14 @@ public static partial class LocalComp
         Dictionary<int, List<LocalCompFile>> updateFileIds)
     {
         var body = $$"""{"fileIds": [{{string.Join(",", updateFileIds.Keys)}}]}""";
+        // 同上：官方接口无密钥恒 403，允许回落镜像
         var response = (JsonObject)Common.GetJson(
             GameDownload.DlModRequest(
                 "https://api.curseforge.com/v1/mods/files",
                 "POST",
                 body,
-                "application/json"));
+                "application/json",
+                true));
         return response["data"] as JsonArray ?? [];
     }
 

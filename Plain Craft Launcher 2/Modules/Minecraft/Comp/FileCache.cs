@@ -120,7 +120,9 @@ public static partial class Comp
                 "https://api.curseforge.com/v1/mods",
                 "POST",
                 "{\"modIds\": [" + string.Join(",", undoneDeps) + "]}",
-                "application/json");
+                "application/json",
+                // 官方批量接口需要 x-api-key，未嵌入密钥时恒 403；允许回落镜像补全前置信息
+                true);
             projects = response["data"] as JsonArray
                 ?? throw new InvalidOperationException("CurseForge 依赖工程数据无效。");
         }

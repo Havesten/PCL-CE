@@ -61,7 +61,10 @@ public static partial class Comp
                         "https://api.curseforge.com/v1/mods",
                         "POST",
                         jsonBody,
-                        "application/json"
+                        "application/json",
+                        // 官方批量接口必须带 x-api-key，未嵌入密钥时恒 403；
+                        // 允许回落到镜像，否则收藏夹、粘贴链接、整合包信息补全全部拿不到数据
+                        true
                     );
 
                     if (response["data"] is not JsonArray rawProjectsData) return;

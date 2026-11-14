@@ -1095,11 +1095,14 @@ public partial class PageInstanceExport : IRefreshable, IPageView
                         {
                             if (modrinthUploadMode) return;
                             var curseForgeHashes = loader.input.Select(m => m.CurseForgeHash);
+                            // 官方指纹接口需要 x-api-key，未嵌入密钥时恒 401；允许回落镜像，
+                            // 否则导出的整合包 manifest 里拿不到 CurseForge 文件 ID
                             var curseForgeRaw = (JsonNode)((JsonObject)Common.GetJson(
                                 GameDownload.DlModRequest("https://api.curseforge.com/v1/fingerprints/432/",
                                     "POST",
                                     $"{{\"fingerprints\": [{curseForgeHashes.Join(",")}]}}",
-                                    "application/json")))
+                                    "application/json",
+                                    true)))
                                 ["data"]["exactMatches"];
                             foreach (JsonObject resultJson in curseForgeRaw.AsArray())
                             {
