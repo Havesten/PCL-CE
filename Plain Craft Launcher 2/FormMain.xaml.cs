@@ -41,19 +41,18 @@ public partial class FormMain
     {
         Common.RunInNewThread(() =>
         {
-            // 更新时写下的日志文件优先；缺失或为空时回退云端「更新」页配置的更新日志
-            var changelogFile = $"{Common.pathTemp}CEUpdateLog.md";
-            var changelog = File.Exists(changelogFile) ? Common.ReadFile(changelogFile) : "";
-            if (string.IsNullOrWhiteSpace(changelog))
+            // 只读云端「更新」页配置的正文（apiv2/updateinfo.json 的 changelog）。
+            // 不再读本地 CEUpdateLog.md：该文件位于共享的 PCL\Cache 下，可能残留其它构建
+            // （例如上游 PCL CE）写入的文案，导致界面出现与我们版本无关的更新说明。
+            string changelog;
+            try
             {
-                try
-                {
-                    changelog = UpdateManager.FetchCloudChangelog();
-                }
-                catch (Exception ex)
-                {
-                    Common.Log(ex, "[UpdateLog] 获取云端更新日志失败");
-                }
+                changelog = UpdateManager.FetchCloudChangelog();
+            }
+            catch (Exception ex)
+            {
+                Common.Log(ex, "[UpdateLog] 获取云端更新日志失败");
+                changelog = "";
             }
             if (string.IsNullOrWhiteSpace(changelog))
                 changelog = Lang.Text("Main.UpdateLog.Empty");

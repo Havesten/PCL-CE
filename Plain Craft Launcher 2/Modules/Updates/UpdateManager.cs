@@ -171,7 +171,9 @@ public static class UpdateManager
                     SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64
                 );
 
-                Common.WriteFile($"{Common.pathTemp}CEUpdateLog.md", version.Changelog);
+                // 更新日志不再落盘到 PCL\Cache\CEUpdateLog.md：
+                // 该目录与其它构建（如上游 PCL CE）共用，写入后会被当成本版本的更新日志展示。
+                // 展示时统一从云端 updateinfo.json 的 changelog 读取。
                 Common.Log(
                     $"[Update] 远程最新版本: {version.VersionName}, 当前版本: {Common.VersionBaseName}");
                 if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
