@@ -10,6 +10,21 @@ namespace PCL;
 
 public class MyImage : Image
 {
+    // 资源列表一屏就是几十上百个图标。不限制并发的话，一次全部发起下载 + 解码，
+    // 网络栈和 CPU 会被同时打满，表现就是「图标一多，搜索要等半天才回来」。
+    // 下载与解码各开一道闸，多余的排队，不影响单个图片的加载逻辑。
+    private const int MaxConcurrentLoads = 6;
+
+    private static readonly SemaphoreSlim DownloadSlots = new(MaxConcurrentLoads);
+
+    private static readonly SemaphoreSlim DecodeSlots = new(MaxConcurrentLoads);
+
+    // 同一个图片文件经常被重复显示（重建列表、滚动回来），
+    // 解码结果按「路径 + 修改时间」缓存，避免每次重新解码并泄漏 GDI+ 位图。
+    private static readonly ConcurrentDictionary<string, ImageSource> DecodedCache = new();
+
+    private const int DecodedCacheLimit = 512;
+
     public MyImage()
     {
         Initialized += (_, _) => Load();
@@ -33,7 +48,37 @@ public class MyImage : Image
             {
                 try
                 {
-                    ImageSource bitmap = value is null ? null : await Task.Run(() => new MyBitmap(value));
+                    if (value is null)
+                    {
+                        base.Source = null;
+                        return;
+                    }
+
+                    var cacheKey = GetDecodeCacheKey(value);
+                    if (DecodedCache.TryGetValue(cacheKey, out var cached))
+                    {
+                        base.Source = cached;
+                        return;
+                    }
+
+                    ImageSource bitmap;
+                    await DecodeSlots.WaitAsync();
+                    try
+                    {
+                        bitmap = await Task.Run(() => new MyBitmap(value));
+                    }
+                    finally
+                    {
+                        DecodeSlots.Release();
+                    }
+
+                    if (bitmap is not null)
+                    {
+                        if (DecodedCache.Count >= DecodedCacheLimit)
+                            DecodedCache.Clear(); // 简单粗暴地上限保护，不做 LRU
+                        DecodedCache[cacheKey] = bitmap;
+                    }
+
                     base.Source = bitmap;
                 }
                 catch (Exception ex)
@@ -51,6 +96,24 @@ public class MyImage : Image
             })); // 在这里先触发可能的文件读取，尽量避免在 UI 线程中读取文件
             // ignored
         }
+    }
+
+    /// <summary>
+    ///     解码缓存的键：文件路径 + 最后写入时间；临时缓存图被重下时应重新解码。
+    /// </summary>
+    private static string GetDecodeCacheKey(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                return path + "|" + new FileInfo(path).LastWriteTimeUtc.Ticks;
+        }
+        catch
+        {
+            // 拿不到时间就当不能缓存
+        }
+
+        return path + "|0";
     }
 
     private void Load() // 属性读取顺序修正：在完成 XAML 属性读取后再触发图片加载（#4868）
@@ -139,6 +202,8 @@ public class MyImage : Image
         var tempPath = GetTempPath(url);
         var tempDownloadingPath = tempPath + RandomUtils.NextInt(0, 1000000);
 
+        // 与解码分开的两道闸：下载排队，避免几十上百个图标同时抢占连接
+        await DownloadSlots.WaitAsync();
         try
         {
             Directory.CreateDirectory(
@@ -168,6 +233,10 @@ public class MyImage : Image
 
             Common.Log(ex, $"Try to get online image fail (url = {url}, dest = {tempPath})");
             return string.Empty;
+        }
+        finally
+        {
+            DownloadSlots.Release();
         }
     }
 

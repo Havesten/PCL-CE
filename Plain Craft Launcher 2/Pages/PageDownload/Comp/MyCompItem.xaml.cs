@@ -124,6 +124,9 @@ public partial class MyCompItem
             if ((_vm.TitleText ?? "") == (value ?? ""))
                 return;
             _vm.TitleText = value;
+            // 名称被省略号截断时，悬停看全名
+            if (LabTitle is not null)
+                LabTitle.ToolTip = string.IsNullOrWhiteSpace(value) ? null : value;
         }
     }
 
@@ -164,7 +167,31 @@ public partial class MyCompItem
         MouseLeave += RefreshColor;
         MouseLeftButtonDown += RefreshColor;
         MouseLeftButtonUp += RefreshColor;
-        // Handles
+        // 标题过长时不能让右侧按钮被挤出可视区（否则收藏/下载点不到）
+        SizeChanged += (_, _) => UpdateTitleWidthLimit();
+        Loaded += (_, _) => UpdateTitleWidthLimit();
+        if (PanButtons is not null) PanButtons.SizeChanged += (_, _) => UpdateTitleWidthLimit();
+    }
+
+    /// <summary>
+    ///     按实际可用宽度给标题一个上限：超出部分用省略号截断，鼠标悬停可看全名。
+    ///     不加限制时，Auto 宽度的标题列会把右侧按钮推到窗口外，表现为「长名字的 Mod 点不了」。
+    /// </summary>
+    private void UpdateTitleWidthLimit()
+    {
+        if (LabTitle is null || LabTitleRaw is null)
+            return;
+        var buttons = PanButtons?.ActualWidth ?? 0d;
+        // 预留：左内边距 7 + Logo 50 + 间距 8 + 按钮区 + 安全余量
+        var available = ActualWidth - (7d + 50d + 8d + buttons + 16d);
+        if (available <= 0d)
+            return;
+        var titleLimit = Math.Max(48d, available * 0.78d);
+        var rawLimit = Math.Max(32d, available - titleLimit);
+        if (Math.Abs(LabTitle.MaxWidth - titleLimit) > 0.5d)
+            LabTitle.MaxWidth = titleLimit;
+        if (Math.Abs(LabTitleRaw.MaxWidth - rawLimit) > 0.5d)
+            LabTitleRaw.MaxWidth = rawLimit;
     }
 
     // 指向时扩展描述
@@ -411,11 +438,11 @@ public partial class MyCompItem
     {
         if (button is null || button.Visibility != Visibility.Visible) return false;
         var bounds = new Rect(button.TranslatePoint(new Point(0d, 0d), this), button.RenderSize);
-    #endregion
-    #region 后加载指向背景
         return bounds.Contains(clickPosition);
     }
 
+    #endregion
+    #region 后加载指向背景
 
     private Border _rectBack;
 
@@ -446,10 +473,11 @@ public partial class MyCompItem
                 // IsHitTestVisible = "False" Opacity="0" BorderThickness="1"
                 // Grid.ColumnSpan = "4" Background="{DynamicResource ColorBrush7}" BorderBrush="{DynamicResource ColorBrush6}"/>-->
             }
-    #endregion
 
             return _rectBack;
         }
     }
+
+    #endregion
 
 }

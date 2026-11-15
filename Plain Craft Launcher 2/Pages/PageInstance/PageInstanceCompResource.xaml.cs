@@ -634,7 +634,7 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
     {
         if (PanList is null)
             return;
-        var showingMods = (IsSearching ? searchResult : modItems.Values.Select(i => i.Entry))
+        var showingMods = CurrentEntries
             .Where(m => CanPassFilter(m)).ToList();
 
         // 对显示的资源进行排序，确保文件夹置顶
@@ -646,29 +646,36 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
 
         // 重新列出列表
         Animations.AniBeginControl();
-        _vm.ShowItemList = showingMods.Any();
-        if (showingMods.Any())
+        _suppressSelectionSync = true; // 下面会按 selectedMods 重置勾选状态，期间不要让 CheckChanged 反向记账
+        try
         {
-            PanList.Children.Clear();
-            foreach (var TargetMod in showingMods)
+            _vm.ShowItemList = showingMods.Any();
+            if (showingMods.Any())
             {
-                if (!modItems.ContainsKey(TargetMod.RawPath))
-                    continue;
-                var item = modItems[TargetMod.RawPath];
+                PanList.Children.Clear();
+                foreach (var TargetMod in showingMods)
+                {
+                    if (!modItems.ContainsKey(TargetMod.RawPath))
+                        continue;
+                    var item = modItems[TargetMod.RawPath];
 
-                // 确保元素没有父容器，避免重复添加异常
-                if (item.Parent is not null) ((Panel)item.Parent).Children.Remove(item);
+                    // 确保元素没有父容器，避免重复添加异常
+                    if (item.Parent is not null) ((Panel)item.Parent).Children.Remove(item);
 
-                TextStyles.MinecraftFormatter.SetColorfulTextLab(item.LabTitle.Text, item.LabTitle,
-                    ThemeService.IsDarkMode);
-                TextStyles.MinecraftFormatter.SetColorfulTextLab(item.LabInfo.Text, item.LabInfo,
-                    ThemeService.IsDarkMode);
-                item.Checked = selectedMods.Contains(TargetMod.RawPath); // 更新选中状态
-                PanList.Children.Add(item);
+                    TextStyles.MinecraftFormatter.SetColorfulTextLab(item.LabTitle.Text, item.LabTitle,
+                        ThemeService.IsDarkMode);
+                    TextStyles.MinecraftFormatter.SetColorfulTextLab(item.LabInfo.Text, item.LabInfo,
+                        ThemeService.IsDarkMode);
+                    item.Checked = selectedMods.Contains(TargetMod.RawPath); // 更新选中状态
+                    PanList.Children.Add(item);
+                }
             }
         }
-
-        Animations.AniEndControl();
+        finally
+        {
+            _suppressSelectionSync = false;
+            Animations.AniEndControl();
+        }
         selectedMods =
             new HashSet<string>(selectedMods.Where(m => showingMods.Any(s => (s.RawPath ?? "") == (m ?? ""))));
         RefreshBars();
@@ -679,8 +686,14 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
     /// </summary>
     public void RefreshBars()
     {
+        // 连点/滑动多选时每改一项都会触发一次刷新，这里合并成一次派发，
+        // 否则一次全选就会排出上百个 Dispatcher 任务，界面直接卡住。
+        if (_refreshBarsPending)
+            return;
+        _refreshBarsPending = true;
         Dispatcher.BeginInvoke(new Func<Task>(async () =>
         {
+            _refreshBarsPending = false;
             // -----------------
             // 顶部栏
             // -----------------
@@ -691,7 +704,7 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
             var disabledCount = 0;
             var updateCount = 0;
             var unavalialeCount = 0;
-            var itemSource = (IsSearching ? searchResult : modItems.Values.Select(i => i.Entry)).ToArray();
+            var itemSource = CurrentEntries.ToArray();
             await Task.Run(() =>
             {
                 foreach (var item in itemSource)
@@ -1363,10 +1376,23 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
     /// </summary>
     public HashSet<string> selectedMods = new();
 
+    /// <summary>
+    ///     批量重建列表 / 全选期间为 true：此时勾选状态由调用方统一写入，CheckChanged 不再反向记账。
+    /// </summary>
+    private bool _suppressSelectionSync;
+
+    /// <summary>
+    ///     是否已有一次 RefreshBars 在排队，用于把连点产生的重复刷新合并掉。
+    /// </summary>
+    private bool _refreshBarsPending;
+
     // 单项切换选择状态
     public void CheckChanged(MyLocalCompItem sender, Common.RouteEventArgs e)
     {
-        if (Animations.AniExitsAnyControl())
+        // 批量刷新（RefreshUI / 全选）期间由调用方自己维护 selectedMods，这里不重复记账。
+        // 注意不能再用「正在放动画就跳过」的判据：列表项的悬停动画几乎从不间断，
+        // 那样会让复选框状态和 selectedMods 长期不一致，批量操作漏项、计数不对。
+        if (_suppressSelectionSync)
             return;
         // 更新选择了的内容
         var selectedKey = sender.Entry.RawPath;
@@ -1381,17 +1407,25 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
     private void ChangeAllSelected(bool value)
     {
         Animations.AniBeginControl();
-        selectedMods.Clear();
-        foreach (var Item in modItems.Values)
+        _suppressSelectionSync = true;
+        try
         {
-            // #4992，Mod 从过滤器看可能不应在列表中，但因为刚切换状态所以依然保留在列表中，所以应该从列表 UI 判断，而非从过滤器判断
-            var shouldSelected = value && PanList.Children.Contains(Item);
-            Item.Checked = shouldSelected;
-            if (shouldSelected)
-                selectedMods.Add(Item.Entry.RawPath);
+            selectedMods.Clear();
+            foreach (var Item in modItems.Values)
+            {
+                // #4992，Mod 从过滤器看可能不应在列表中，但因为刚切换状态所以依然保留在列表中，所以应该从列表 UI 判断，而非从过滤器判断
+                var shouldSelected = value && PanList.Children.Contains(Item);
+                Item.Checked = shouldSelected;
+                if (shouldSelected)
+                    selectedMods.Add(Item.Entry.RawPath);
+            }
+        }
+        finally
+        {
+            _suppressSelectionSync = false;
+            Animations.AniEndControl();
         }
 
-        Animations.AniEndControl();
         RefreshBars();
     }
 
@@ -1509,7 +1543,7 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
                 }
             case FilterType.Duplicate:
                 {
-                    var itemSource = IsSearching
+                    var itemSource = IsSearching && searchResult is not null
                         ? searchResult
                         : LocalComp.CompResourceListLoader.output ?? new List<LocalComp.LocalCompFile>();
                     return itemSource is not null && itemSource.Where(m =>
@@ -2922,6 +2956,17 @@ public partial class PageInstanceCompResource : IRefreshable, IPageView
     #region 搜索
 
     public bool IsSearching => !string.IsNullOrWhiteSpace(_vm.SearchText);
+
+    /// <summary>
+    ///     当前列表应展示的条目来源。
+    ///     搜索文本一改 IsSearching 立刻为 true，但结果有 350ms 防抖，
+    ///     这期间 searchResult 还是上一轮甚至为 null——刷新/筛选若直接用它就会抛空引用，
+    ///     表现为「打字时列表闪一下错误」或干脆崩掉。这里统一兜底回全量。
+    /// </summary>
+    private IEnumerable<LocalComp.LocalCompFile> CurrentEntries =>
+        IsSearching && searchResult is not null
+            ? searchResult
+            : modItems.Values.Select(i => i.Entry);
     private List<LocalComp.LocalCompFile> searchResult;
     private CancellationTokenSource _cancelToken;
 

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using PCL.Core.UI.Controls;
 
@@ -29,6 +30,16 @@ internal static partial class TextStyles
             }
 
             lab.Inlines.Clear();
+
+            // 绝大多数条目没有 Minecraft 颜色代码，走单 Run 的快路径：
+            // 列表里上百行文本每次过滤/搜索都要重新着色，逐字符拼串会明显拖慢刷新。
+            // 这里刻意不设 Foreground，沿用 TextBlock 继承来的颜色，
+            // 与改动前逐字符渲染的结果完全一致（浅色主题下正文不是 #888888）。
+            if (text is null || !text.Contains('§'))
+            {
+                lab.Inlines.Add(new Run(text));
+                return;
+            }
 
             var hasItalicProperty = false;
             var hasDeleteLineProperty = false;

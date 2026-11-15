@@ -24,14 +24,25 @@ internal static partial class TextStyles
 
         public TimerRun(TimeSpan interval = default, bool autoStart = false)
         {
-            _timer = new DispatcherTimer();
-            _timer.Tick += _TimerTick;
             UpdateInterval = interval == TimeSpan.Zero
                 ? TimeSpan.FromSeconds(1d)
                 : interval;
             AutoStart = autoStart;
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
+        }
+
+        /// <summary>
+        ///     计时器按需创建。列表里绝大多数文本 Run 根本不含 §k（随机闪烁），
+        ///     每个都造一个 DispatcherTimer 只会白白拖慢文字渲染。
+        /// </summary>
+        private DispatcherTimer EnsureTimer()
+        {
+            if (_timer is not null)
+                return _timer;
+            _timer = new DispatcherTimer { Interval = UpdateInterval };
+            _timer.Tick += _TimerTick;
+            return _timer;
         }
 
         private object IsTimerRunning => _timer is not null && _timer.IsEnabled;
@@ -94,7 +105,7 @@ internal static partial class TextStyles
             }
 
             if (!(bool)IsTimerRunning)
-                _timer?.Start();
+                EnsureTimer().Start();
         }
 
         public void StopTimer()
