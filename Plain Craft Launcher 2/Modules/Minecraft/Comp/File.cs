@@ -237,7 +237,7 @@ public static partial class Comp
             JsonObject data,
             CompType defaultType)
         {
-            var hashes = data["hashes"]?.AsArray() ?? [];
+            var hashes = data["hashes"] as JsonArray ?? [];
             var result = new CompFileBuildResult
             {
                 FromCurseForge = true,
@@ -295,9 +295,16 @@ public static partial class Comp
         {
             var url = data["downloadUrl"]?.ToString() ?? string.Empty;
 
+            // 兜底 CDN 地址靠 fileId 推算（前 4 位是目录）。上游没给 id 时不能硬解析，
+            // 否则 ArgumentOutOfRange 会把整个整合包安装打断——此时宁可让这个文件不可用。
+            if (string.IsNullOrWhiteSpace(url)
+                && result.Id.Length > 4
+                && int.TryParse(result.Id[..4], out var idFolder)
+                && int.TryParse(result.Id[4..], out var idFile))
+                url = $"https://edge.forgecdn.net/files/{idFolder}/{idFile}/{result.FileName}";
+
             if (string.IsNullOrWhiteSpace(url))
-                url =
-                    $"https://edge.forgecdn.net/files/{int.Parse(result.Id[..4])}/{int.Parse(result.Id[4..])}/{result.FileName}";
+                return [];
 
             if (!string.IsNullOrEmpty(result.FileName))
                 url = url.Replace(result.FileName, WebUtility.UrlEncode(result.FileName));

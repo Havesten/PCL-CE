@@ -585,8 +585,10 @@ public static partial class Modpack
             targetInstanceName = instanceName,
             targetInstanceFolder = $@"{GameFolders.mcFolderSelected}versions\{instanceName}\"
         };
-        foreach (var component in packJson["components"]!.AsArray())
-            _ApplyMmcRequestComponent(request, component);
+        // components 缺失或不是数组时不要硬解引用，交给后续流程报「缺少组件」类错误
+        if (packJson["components"] is JsonArray components)
+            foreach (var component in components)
+                _ApplyMmcRequestComponent(request, component);
 
         return request;
     }

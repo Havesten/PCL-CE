@@ -192,18 +192,33 @@ public static partial class Modpack
         Comp.CompLoaderType modLoader)
     {
         var fileList = new List<DownloadFile>();
-        foreach (var file in (dynamic)json["files"]! ?? Array.Empty<JsonNode>())
+        // 与 CurseForge 侧同一约定：一律强类型遍历，不要用 dynamic 访问 JsonNode，
+        // 否则 ToObject 这类扩展方法在运行时无法绑定。
+        if (json["files"] is not JsonArray files)
+        {
+            Common.Log("[ModPack] modrinth.index.json 中没有可用的 files 数组");
+            return fileList;
+        }
+
+        foreach (var file in files.OfType<JsonObject>())
         {
             if (!_ShouldIncludeModrinthFile(file))
                 continue;
 
-            var urls = ((JsonArray)file["downloads"])
-                .OfType<JsonNode>()
-                .Select(x => Comp.CompFile.HandleCurseForgeDownloadUrls(x.ToString()))
+            var urls = (file["downloads"] as JsonArray ?? new JsonArray())
+                .Select(x => Comp.CompFile.HandleCurseForgeDownloadUrls(x?.ToString() ?? ""))
+                .Where(x => !string.IsNullOrEmpty(x))
                 .ToList();
             urls = [.. urls.SelectMany(GameDownload.DlSourceModDownloadGet)];
+            var filePath = file["path"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                Common.Log("[ModPack] 跳过一条没有路径信息的 Modrinth 文件记录");
+                continue;
+            }
+
             var targetPath =
-                $@"{GameFolders.mcFolderSelected}versions\{instanceName}\{file["path"]}";
+                $@"{GameFolders.mcFolderSelected}versions\{instanceName}\{filePath}";
             if (!Path
                     .GetFullPath(targetPath)
                     .StartsWithF($@"{GameFolders.mcFolderSelected}versions\{instanceName}\", true))
@@ -229,8 +244,8 @@ public static partial class Modpack
                     ),
                     targetPath,
                     new Common.FileChecker(
-                        actualSize: ((JsonNode)file["fileSize"]).ToObject<long>(),
-                        hash: file["hashes"]["sha1"].ToString()
+                        actualSize: _ReadFileSize(file["fileSize"]),
+                        hash: file["hashes"]?["sha1"]?.ToString() ?? ""
                     ),
                     true));
         }
@@ -238,20 +253,39 @@ public static partial class Modpack
         return fileList;
     }
 
+    /// <summary>
+    ///     fileSize 理论上是数字，个别整合包写成字符串，这里两种都接受；拿不到就按 0（跳过大小校验）。
+    /// </summary>
+    private static long _ReadFileSize(JsonNode? node)
+    {
+        if (node is null)
+            return 0L;
+        try
+        {
+            return node.ToObject<long>();
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, $"[ModPack] 无法解析 Modrinth 文件大小：{node.ToJsonString()}");
+            return 0L;
+        }
+    }
+
     private static bool _ShouldIncludeModrinthFile(JsonNode file)
     {
-        var env = file["env"];
-        if (env is null)
+        // env.client 可能整体缺失（只写了 server），此时按「客户端要装」处理
+        var client = file["env"]?["client"]?.ToString();
+        if (client is null)
             return true;
 
-        return env["client"]!.ToString() switch
+        return client switch
         {
             "optional" => DialogService.Instance.Show(new TextDialogRequest
                 {
                     Title = Lang.Text("Minecraft.Download.Modpack.OptionalFile.Title"),
                     Content = Lang.Text(
                         "Minecraft.Download.Modpack.OptionalFile.Message",
-                        Common.GetFileNameFromPath(file["path"]!.ToString())
+                        Common.GetFileNameFromPath(file["path"]?.ToString() ?? "")
                     ),
                     Buttons = DialogButtons.From(
                         DialogButton.Create(Lang.Text("Minecraft.Download.Modpack.OptionalFile.Download")),

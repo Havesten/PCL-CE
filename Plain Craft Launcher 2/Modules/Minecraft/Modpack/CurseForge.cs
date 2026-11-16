@@ -109,9 +109,11 @@ public static partial class Modpack
         string? neoForgeVersion = null;
         string? fabricVersion = null;
         var modLoader = Comp.CompLoaderType.Any;
-        foreach (var entry in (dynamic)json["minecraft"]!["modLoaders"]! ?? Array.Empty<JsonNode>())
+        // 这里必须保持强类型遍历。JsonNode 上的 ToObject/StartsWithF 都是扩展方法，
+        // 一旦把节点转成 dynamic，编译期就不再绑定扩展方法，只会在运行时抛 RuntimeBinderException。
+        foreach (var entry in json["minecraft"]?["modLoaders"] as JsonArray ?? new JsonArray())
         {
-            string id = (entry["id"] ?? "").ToString().ToLower();
+            var id = (entry?["id"]?.ToString() ?? "").ToLowerInvariant();
             if (id.StartsWithF("forge-"))
             {
                 if (id.Contains("recommended"))
@@ -191,26 +193,77 @@ public static partial class Modpack
     {
         var modList = new List<CurseForgeModRef>();
         var modOptionalList = new List<int>();
-        foreach (var modEntry in (dynamic)json["files"]! ?? Array.Empty<JsonNode>())
-        {
-            // CurseForge 官方示例用 projectID / fileID，但部分打包工具写成 projectId / fileId。
-            var projectIdNode = modEntry["projectID"] ?? modEntry["projectId"];
-            var fileIdNode = modEntry["fileID"] ?? modEntry["fileId"];
-            if (projectIdNode is null || fileIdNode is null)
-            {
-                HintService.Show(Hints.Info(Lang.Text(
-                        "Minecraft.Download.Modpack.ModMissingRequiredInfoSkipped",
-                        modEntry)));
-                continue;
-            }
 
-            var fileId = fileIdNode.ToObject<int>();
-            modList.Add(new CurseForgeModRef(projectIdNode.ToObject<int>(), fileId));
-            if (modEntry["required"] is JsonNode requiredNode && !requiredNode.ToObject<bool>())
-                modOptionalList.Add(fileId);
+        // 强类型遍历：manifest 里的 files 既可能缺失，也可能不是数组（个别打包工具写出对象），
+        // 这种情况下按「没有可下载的模组」处理，交给后续流程报明确错误。
+        if (json["files"] is not JsonArray files)
+        {
+            Common.Log("[ModPack] manifest.json 中没有可用的 files 数组");
+            return (modList, modOptionalList);
+        }
+
+        foreach (var modEntry in files.OfType<JsonObject>())
+        {
+            try
+            {
+                // CurseForge 官方示例用 projectID / fileID，但部分打包工具写成 projectId / fileId。
+                var projectIdNode = modEntry["projectID"] ?? modEntry["projectId"];
+                var fileIdNode = modEntry["fileID"] ?? modEntry["fileId"];
+                if (!_TryGetModId(projectIdNode, out var projectId) || !_TryGetModId(fileIdNode, out var fileId))
+                {
+                    HintService.Show(Hints.Info(Lang.Text(
+                        "Minecraft.Download.Modpack.ModMissingRequiredInfoSkipped",
+                        modEntry["slug"] ?? modEntry["projectID"] ?? modEntry.ToJsonString())));
+                    continue;
+                }
+
+                modList.Add(new CurseForgeModRef(projectId, fileId));
+                if (modEntry["required"] is JsonNode requiredNode && !_TryGetBool(requiredNode, true))
+                    modOptionalList.Add(fileId);
+            }
+            catch (Exception ex)
+            {
+                Common.Log(ex, $"[ModPack] 跳过一条无法解析的模组记录：{modEntry.ToJsonString()}");
+            }
         }
 
         return (modList, modOptionalList);
+    }
+
+    /// <summary>
+    ///     读取 CurseForge 的数字 ID。少数整合包把它写成字符串，
+    ///     这里统一按宽松方式解析，解析不出来就认为这条记录不可用。
+    /// </summary>
+    private static bool _TryGetModId(JsonNode? node, out int value)
+    {
+        value = 0;
+        if (node is null)
+            return false;
+        try
+        {
+            value = node.ToObject<int>();
+            return value > 0;
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, $"[ModPack] 无法解析模组 ID：{node.ToJsonString()}");
+            return false;
+        }
+    }
+
+    private static bool _TryGetBool(JsonNode? node, bool fallback)
+    {
+        if (node is null)
+            return fallback;
+        try
+        {
+            return node.ToObject<bool>();
+        }
+        catch (Exception ex)
+        {
+            Common.Log(ex, $"[ModPack] 无法解析布尔字段：{node.ToJsonString()}");
+            return fallback;
+        }
     }
 
     private static LoaderBase _CreateCurseForgeModDownloadLoaders(
@@ -279,8 +332,8 @@ public static partial class Modpack
                     true));
             if (response["data"] is JsonArray data)
                 foreach (var node in data.OfType<JsonObject>())
-                    if (node["id"] is not null)
-                        fetched[node["id"]!.ToObject<int>()] = node;
+                    if (_TryGetModId(node["id"], out var fileId))
+                        fetched[fileId] = node;
             Common.Log($"[Modpack] 批量接口返回 {fetched.Count}/{refs.Count} 个模组文件信息");
         }
         catch (Exception ex)
@@ -291,10 +344,10 @@ public static partial class Modpack
         // 逐个查询兜底：GET /v1/mods/{projectID}/files/{fileID}。
         // 未配置 API Key 时官方批量接口不可用，而镜像普遍支持该 GET 端点。
         var missing = refs.Where(r => !fetched.ContainsKey(r.FileId)).ToList();
+        var failures = new ConcurrentBag<(CurseForgeModRef Ref, Exception Error)>();
         if (missing.Count != 0)
         {
             Common.Log($"[Modpack] 逐个查询 {missing.Count} 个模组文件信息");
-            var failures = new ConcurrentBag<(CurseForgeModRef Ref, Exception Error)>();
             Parallel.ForEach(
                 missing,
                 new ParallelOptions { MaxDegreeOfParallelism = 6 },
@@ -303,8 +356,9 @@ public static partial class Modpack
                     try
                     {
                         var json = _FetchCurseForgeModFile(modRef);
-                        if (json["data"] is JsonObject fileJson && fileJson["id"] is not null)
-                            fetched[fileJson["id"]!.ToObject<int>()] = fileJson;
+                        // 按请求的 fileId 记账：上游返回的 id 偶有缺失，直接用返回 id 会漏项。
+                        if (json["data"] is JsonObject fileJson)
+                            fetched[modRef.FileId] = fileJson;
                     }
                     catch (Exception ex)
                     {
@@ -319,7 +373,15 @@ public static partial class Modpack
         }
 
         if (fetched.Count == 0)
-            throw new Exception(Lang.Text("Minecraft.Download.Modpack.SomeModsDeleted"));
+        {
+            // 全都拿不到时最常见的原因是云端 CurseForge 反代没配置密钥或网络不通，
+            // 直接抛「模组已被删除」会把人误导到错误方向，这里把首个真实错误带上。
+            var firstError = failures.Select(f => f.Error).FirstOrDefault(e => e is not null);
+            throw new Exception(
+                Lang.Text("Minecraft.Download.Modpack.SomeModsDeleted")
+                + (firstError is null ? "" : $"\n{firstError.Message}"),
+                firstError);
+        }
 
         if (fetched.Count < refs.Count)
             Common.Log($"[Modpack] 有 {refs.Count - fetched.Count} 个模组文件信息缺失，已跳过这些模组");
@@ -372,7 +434,8 @@ public static partial class Modpack
         var fileList = new Dictionary<int, DownloadFile>();
         foreach (var modJson in task.input!.OfType<JsonObject>())
         {
-            var id = modJson["id"].ToObject<int>();
+            // 上游响应偶尔缺 id；用负数补位，避免几条记录都落到同一个键上互相覆盖
+            var id = _TryGetModId(modJson["id"], out var parsedId) ? parsedId : -fileList.Count - 1;
             if (fileList.ContainsKey(id))
                 continue;
             if (modOptionalList.Contains(id)
@@ -413,12 +476,12 @@ public static partial class Modpack
     private static (string Folder, Comp.CompType Type) _ResolveCurseForgeTargetFolder(
         JsonObject modJson)
     {
-        if (modJson["modules"]!.AsArray().Count == 0)
+        // modules 在部分镜像/精简响应里可能缺失，缺失时按普通模组处理
+        if (modJson["modules"] is not JsonArray modules || modules.Count == 0)
             return ("mods", Comp.CompType.Mod);
 
-        var moduleNames = modJson["modules"]!
-            .AsArray()
-            .Select(l => l!["name"]!.ToString())
+        var moduleNames = modules
+            .Select(l => l?["name"]?.ToString() ?? "")
             .ToList();
         if (moduleNames.Contains("META-INF")
             || moduleNames.Contains("mcmod.info")
