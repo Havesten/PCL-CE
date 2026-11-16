@@ -42,6 +42,12 @@ public class UpdatesCloudModel : IUpdateSource
     /// <summary>当前已获取的更新日志正文（需先 <see cref="RefreshCache" />）。</summary>
     public string Changelog => _info?.Changelog ?? "";
 
+    /// <summary>缓存里的最新版本号，不触发请求。</summary>
+    public string CachedLatestVersion => _info?.LatestVersion ?? "";
+
+    /// <summary>缓存里的下载直链，不触发请求；用于「自动更新失败后请手动下载」的提示。</summary>
+    public string CachedDownloadUrl => _info?.DownloadURL ?? "";
+
     public bool IsAvailable()
     {
         return !string.IsNullOrWhiteSpace(_baseUrl);

@@ -204,8 +204,8 @@ public partial class PageSetupUpdate : IPageView
     private void BtnUpdate_Click(object sender, MouseButtonEventArgs e)
     {
         if (UpdateManager.isUpdateWaitingRestart) UpdateManager.UpdateRestart(true);
-        // 开始更新流程
-        UpdateManager.UpdateStart(UpdateEnums.UpdateType.UpdateNow);
+        // 开始更新流程。用户手动点的，不受「连续失败后不再自动重试」的限制。
+        UpdateManager.UpdateStart(UpdateEnums.UpdateType.UpdateNow, manual: true);
     }
 
     private async void BtnChangelogDetail_Click(object sender, EventArgs e)

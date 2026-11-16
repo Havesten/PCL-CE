@@ -3472,6 +3472,8 @@
     <sys:String x:Key="Update.Error.UnableToGetUpdate">Unable to get update information</sys:String>
     <sys:String x:Key="Update.Error.UpdateBlocked">Update failed</sys:String>
     <sys:String x:Key="Update.Error.UpdateBlockedMessage">PCLCE-NS cannot update because it was blocked by Windows Security or does not have sufficient permissions.&#xA;Please add the PCLCE-NS folder to the exclusion list, or manually replace the current file with {0}PCL\Plain Craft Launcher Community Edition.exe!</sys:String>
+    <sys:String x:Key="Update.Error.SamePackage">The downloaded package is identical to the current version. The server package may not have been updated yet, so installation was stopped. Please try again later.</sys:String>
+    <sys:String x:Key="Update.Error.ManualUpdateNeeded">Automatic update to {0} has failed repeatedly and will not be retried automatically this time.&#xA;Please download the new version manually: {1}</sys:String>
     <sys:String x:Key="Update.Service.PclCe">PCLCE-NS service</sys:String>
     <sys:String x:Key="Update.Title">Launcher update</sys:String>
 

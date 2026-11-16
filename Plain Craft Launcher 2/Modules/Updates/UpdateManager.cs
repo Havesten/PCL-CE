@@ -159,7 +159,8 @@ public static class UpdateManager
     /// <summary>自替换器副本。由当前进程复制自身得到，不随版本变化。</summary>
     private static string UpdaterPath => Path.Combine(Common.ExePath, "PCL", "Update", "Updater.exe");
 
-    public static void UpdateStart(UpdateEnums.UpdateType type, string receivedKey = null, bool forceValidated = false)
+    public static void UpdateStart(UpdateEnums.UpdateType type, string receivedKey = null, bool forceValidated = false,
+        bool manual = false)
     {
         Common.RunInNewThread(() =>
         {
@@ -178,6 +179,19 @@ public static class UpdateManager
                     $"[Update] 远程最新版本: {version.VersionName}, 当前版本: {Common.VersionBaseName}");
                 if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(Common.VersionBaseName)))
                     return;
+
+                // 同一个版本连续替换失败多次后不再自动重试：部分设备上目录被占用/权限不足时，
+                // 自动重试只会变成「每次启动都下载一遍、装不上、再提示」的死循环。
+                // 用户手动点「检查更新」不受此限制（manual）。
+                if (!manual && UpdateStateStore.ShouldSkipAutoUpdate(Common.ExePath, version.VersionName))
+                {
+                    var latest = version.VersionName;
+                    Common.Log($"[Update] {latest} 已连续自动更新失败，本次跳过自动更新，提示手动下载");
+                    if (effectiveType != UpdateEnums.UpdateType.Silent || IsForceRequired(version))
+                        Common.RunInUi(() => HintService.Show(Hints.Error(
+                            Lang.Text("Update.Error.ManualUpdateNeeded", latest, GetManualDownloadUrl()))));
+                    return;
+                }
 
                 // 强制更新（云端「是否强制更新」或低于「强制最低版本」）不允许跳过，
                 // 也不弹询问框：直接下载 → 替换 → 重启，用户下次看到的就是新版本。
@@ -219,16 +233,25 @@ public static class UpdateManager
                     SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, dlTargetPath));
                 loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Check"), _ =>
                 {
-                    // 云端下载直链不附带哈希时跳过校验
-                    if (string.IsNullOrWhiteSpace(version.Sha256))
-                        return;
-                    var curHash = Common.GetFileSha256(dlTargetPath);
-                    if ((curHash ?? "") != (version.Sha256 ?? ""))
-                        throw new Exception(Lang.Text("Update.Error.Sha256Mismatch", version.Sha256, curHash));
+                    var newHash = Common.GetFileSha256(dlTargetPath) ?? "";
+                    // 云端下载直链不附带哈希时跳过严格校验
+                    if (!string.IsNullOrWhiteSpace(version.Sha256) && newHash != version.Sha256)
+                        throw new Exception(Lang.Text("Update.Error.Sha256Mismatch", version.Sha256, newHash));
+
+                    // 下载回来的包与正在运行的 exe 完全相同，说明服务器上还是旧包
+                    // （典型情况：下载直链被 CDN 缓存）。此时替换只会白折腾一次，
+                    // 用户看到的现象是「更新完了版本号没变，下次启动又提示更新」。
+                    var currentHash = Common.GetFileSha256(Basics.ExecutablePath) ?? "";
+                    if (!string.IsNullOrEmpty(newHash) && newHash == currentHash)
+                    {
+                        Common.Log($"[Update] 下载到的安装包与当前版本相同（sha256={newHash}），" +
+                                   "判定为服务器尚未更新安装包，停止替换");
+                        throw new Exception(Lang.Text("Update.Error.SamePackage"));
+                    }
                 }));
                 if (effectiveType == UpdateEnums.UpdateType.UpdateNow)
                     loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Install"),
-                        _ => UpdateRestart(true)));
+                        _ => UpdateRestart(true, true, version.VersionName)));
                 else if (effectiveType == UpdateEnums.UpdateType.Silent)
                     loaders.Add(new Loading.LoaderTask<int, int>(Lang.Text("Update.Task.Prepare"),
                         _ => isUpdateWaitingRestart = true));
@@ -288,7 +311,8 @@ public static class UpdateManager
         });
     }
 
-    public static void UpdateRestart(bool triggerRestartAndByEnd, bool triggerRestart = true)
+    public static void UpdateRestart(bool triggerRestartAndByEnd, bool triggerRestart = true,
+        string? targetVersion = null)
     {
         try
         {
@@ -300,9 +324,12 @@ public static class UpdateManager
             }
 
             var updater = PrepareUpdater();
-            // 由更新器完成真正的替换：它等本进程退出后才动手，避免覆盖正在运行的文件
+            // 由更新器完成真正的替换：它等本进程退出后才动手，避免覆盖正在运行的文件。
+            // 最后的版本号只用于「替换失败记账」，缺省时更新器会自己忽略。
+            var versionArg = targetVersion ?? _cloudSource.CachedLatestVersion;
             var args =
-                $"--apply-update {Environment.ProcessId} \"{Basics.ExecutablePath}\" \"{source}\" {(triggerRestart ? "1" : "0")}";
+                $"--apply-update {Environment.ProcessId} \"{Basics.ExecutablePath}\" \"{source}\" " +
+                $"{(triggerRestart ? "1" : "0")} \"{versionArg}\"";
             Common.Log("[System] 启动自更新器，参数：" + args);
             Process.Start(new ProcessStartInfo(updater)
             {
@@ -354,6 +381,16 @@ public static class UpdateManager
             File.Copy(Basics.ExecutablePath, alternative, true);
             return alternative;
         }
+    }
+
+    /// <summary>
+    ///     手动下载地址：自动更新连续失败时提示用户自己下载用。
+    ///     只读缓存，不发请求（可能被 UI 线程调用）。
+    /// </summary>
+    public static string GetManualDownloadUrl()
+    {
+        var url = _cloudSource.CachedDownloadUrl;
+        return string.IsNullOrWhiteSpace(url) ? "（请在设置 → 关于 中查看下载地址）" : url;
     }
 
     /// <summary>更新前退出：优先走正常退出流程（保存配置），窗体还没建好时直接结束进程。</summary>
