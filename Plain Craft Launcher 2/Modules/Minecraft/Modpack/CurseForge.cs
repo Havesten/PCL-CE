@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.IO;
+﻿using System.IO;
 using System.IO.Compression;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
@@ -184,14 +183,13 @@ public static partial class Modpack
     }
 
     /// <summary>
-    ///     CurseForge 整合包 manifest 中的一条模组引用：projectID 用于按项目查询，fileID 用于定位具体版本。
+    ///     采集 manifest 里要下载的模组。与上游保持一致：只记 fileID，
+    ///     后续统一用批量接口查询，不再按 projectID 逐个补查。
     /// </summary>
-    private readonly record struct CurseForgeModRef(int ProjectId, int FileId);
-
-    private static (List<CurseForgeModRef> ModList, List<int> OptionalList) _CollectCurseForgeModIds(
+    private static (List<int> ModList, List<int> OptionalList) _CollectCurseForgeModIds(
         JsonObject json)
     {
-        var modList = new List<CurseForgeModRef>();
+        var modList = new List<int>();
         var modOptionalList = new List<int>();
 
         // 强类型遍历：manifest 里的 files 既可能缺失，也可能不是数组（个别打包工具写出对象），
@@ -209,7 +207,7 @@ public static partial class Modpack
                 // CurseForge 官方示例用 projectID / fileID，但部分打包工具写成 projectId / fileId。
                 var projectIdNode = modEntry["projectID"] ?? modEntry["projectId"];
                 var fileIdNode = modEntry["fileID"] ?? modEntry["fileId"];
-                if (!_TryGetModId(projectIdNode, out var projectId) || !_TryGetModId(fileIdNode, out var fileId))
+                if (!_TryGetModId(projectIdNode, out _) || !_TryGetModId(fileIdNode, out var fileId))
                 {
                     HintService.Show(Hints.Info(Lang.Text(
                         "Minecraft.Download.Modpack.ModMissingRequiredInfoSkipped",
@@ -217,7 +215,7 @@ public static partial class Modpack
                     continue;
                 }
 
-                modList.Add(new CurseForgeModRef(projectId, fileId));
+                modList.Add(fileId);
                 if (modEntry["required"] is JsonNode requiredNode && !_TryGetBool(requiredNode, true))
                     modOptionalList.Add(fileId);
             }
@@ -267,17 +265,21 @@ public static partial class Modpack
     }
 
     private static LoaderBase _CreateCurseForgeModDownloadLoaders(
-        List<CurseForgeModRef> modList,
+        List<int> modList,
         List<int> modOptionalList,
         JsonObject json,
         string instanceName,
         Comp.CompLoaderType modLoader)
     {
+        // 「取信息」与「构造任务」拆成两个加载器只是为了进度条好看，文件数组改用闭包共享：
+        // 不再依赖加载器之间的 output → input 传递。那一环一旦没接上，整合包会「安装成功但一个模组都不下载」，
+        // 现场日志里只能看到「下载模组 0 个任务」，完全定位不到原因。
+        var fetchedModFiles = new JsonArray();
         var modDownloadLoaders = new List<LoaderBase>
         {
             new LoaderTask<int, JsonArray>(
                 Lang.Text("Minecraft.Download.Modpack.Stage.PrepareModsDownloadInfo"),
-                task => _FetchCurseForgeModFiles(modList, task))
+                task => _FetchCurseForgeModFiles(modList, task, fetchedModFiles))
             {
                 ProgressWeight = modList.Count / 10d
             },
@@ -286,6 +288,7 @@ public static partial class Modpack
                 task =>
                     _BuildCurseForgeDownloadFiles(
                         task,
+                        fetchedModFiles,
                         modList,
                         modOptionalList,
                         json,
@@ -309,131 +312,72 @@ public static partial class Modpack
         };
     }
 
-    private static void _FetchCurseForgeModFiles(List<CurseForgeModRef> modList,
-        LoaderTask<int, JsonArray> task)
+    /// <summary>
+    ///     批量查询模组文件信息。与上游实现保持一致：只用一次 POST /v1/mods/files 拿全部，
+    ///     镜像源返回的数量不足时改为强制走官方源重试，而不是逐个 GET 补查——
+    ///     逐个补查拿到的 JSON 字段不全（缺 modules / fileName），会把模组塞错目录或漏装。
+    /// </summary>
+    private static void _FetchCurseForgeModFiles(
+        List<int> modList,
+        LoaderTask<int, JsonArray> task,
+        JsonArray sink)
     {
-        var refs = modList
-            .GroupBy(r => r.FileId)
-            .Select(g => g.First())
-            .ToList();
-        var fileIdList = refs.Select(r => r.FileId).ToList();
-        var fetched = new ConcurrentDictionary<int, JsonObject>();
-
-        // 批量接口：官方 api.curseforge.com 需要 x-api-key，镜像则不保证支持 POST。
-        // 任一条件不满足时这里会抛异常，由下方的逐个查询兜底，避免整个导入直接失败。
-        try
+        var fileIds = modList.Distinct().ToList();
+        var allowMirror = true;
+        JsonArray files;
+        var tryCount = 0;
+        do
         {
+            tryCount += 1;
             var response = (JsonObject)Common.GetJson(
                 GameDownload.DlModRequest(
                     "https://api.curseforge.com/v1/mods/files",
                     "POST",
-                    $"{{\"fileIds\": [{fileIdList.Join(",")}]}}",
+                    $"{{\"fileIds\": [{fileIds.Join(",")}]}}",
                     "application/json",
-                    true));
-            if (response["data"] is JsonArray data)
-                foreach (var node in data.OfType<JsonObject>())
-                    if (_TryGetModId(node["id"], out var fileId))
-                        fetched[fileId] = node;
-            Common.Log($"[Modpack] 批量接口返回 {fetched.Count}/{refs.Count} 个模组文件信息");
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "[Modpack] 批量获取 CurseForge 模组文件信息失败，改为逐个查询");
-        }
-
-        // 逐个查询兜底：GET /v1/mods/{projectID}/files/{fileID}。
-        // 未配置 API Key 时官方批量接口不可用，而镜像普遍支持该 GET 端点。
-        var missing = refs.Where(r => !fetched.ContainsKey(r.FileId)).ToList();
-        var failures = new ConcurrentBag<(CurseForgeModRef Ref, Exception Error)>();
-        if (missing.Count != 0)
-        {
-            Common.Log($"[Modpack] 逐个查询 {missing.Count} 个模组文件信息");
-            Parallel.ForEach(
-                missing,
-                new ParallelOptions { MaxDegreeOfParallelism = 6 },
-                modRef =>
-                {
-                    try
-                    {
-                        var json = _FetchCurseForgeModFile(modRef);
-                        // 按请求的 fileId 记账：上游返回的 id 偶有缺失，直接用返回 id 会漏项。
-                        if (json["data"] is JsonObject fileJson)
-                            fetched[modRef.FileId] = fileJson;
-                    }
-                    catch (Exception ex)
-                    {
-                        failures.Add((modRef, ex));
-                    }
-                });
-
-            foreach (var (modRef, error) in failures)
-                Common.Log(
-                    error,
-                    $"[Modpack] 获取模组文件信息失败（project={modRef.ProjectId}, file={modRef.FileId}）");
-        }
-
-        if (fetched.Count == 0)
-        {
-            // 全都拿不到时最常见的原因是云端 CurseForge 反代没配置密钥或网络不通，
-            // 直接抛「模组已被删除」会把人误导到错误方向，这里把首个真实错误带上。
-            var firstError = failures.Select(f => f.Error).FirstOrDefault(e => e is not null);
-            throw new Exception(
-                Lang.Text("Minecraft.Download.Modpack.SomeModsDeleted")
-                + (firstError is null ? "" : $"\n{firstError.Message}"),
-                firstError);
-        }
-
-        if (fetched.Count < refs.Count)
-            Common.Log($"[Modpack] 有 {refs.Count - fetched.Count} 个模组文件信息缺失，已跳过这些模组");
-
-        var files = new JsonArray();
-        foreach (var file in fetched.Values)
-            files.Add(file.DeepClone());
-
-        task.output = files;
-    }
-
-    /// <summary>
-    ///     获取单个模组文件的详细信息。优先走镜像：官方源需要 API Key，
-    ///     若逐个查询都先等官方超时，导入过程会被拖得非常慢。
-    ///     真正回落到官方时走自建云端（客户端不内置 Key），由云端注入密钥转发。
-    /// </summary>
-    private static JsonObject _FetchCurseForgeModFile(CurseForgeModRef modRef)
-    {
-        var official = $"https://api.curseforge.com/v1/mods/{modRef.ProjectId}/files/{modRef.FileId}";
-        var mirror = GameDownload.DlSourceModGet(official);
-        if (mirror != official)
-            try
+                    allowMirror));
+            files = response["data"] as JsonArray ?? new JsonArray();
+            if (fileIds.Count <= files.Count)
             {
-                return (JsonObject)Common.GetJson(
-                    Requester.FetchString(
-                        mirror,
-                        new RequestParam { Timeout = 10000, Retries = 2, UseBrowserUserAgent = true }));
-            }
-            catch (Exception ex)
-            {
-                Common.Log(
-                    ex,
-                    $"[Modpack] 镜像获取模组文件信息失败，回退官方源（project={modRef.ProjectId}, file={modRef.FileId}）");
+                Common.Log($"[Modpack] 已获取 {files.Count} 个模组文件信息，开始进行下一步");
+                break;
             }
 
-        return (JsonObject)Common.GetJson(
-            Requester.FetchString(
-                GameDownload.DlSourceModCloudGet(official),
-                new RequestParam { Timeout = 15000, Retries = 2, UseBrowserUserAgent = true }));
+            allowMirror = false;
+            Common.Log($"[Modpack] 获取到的模组数量不达标（{files.Count}/{fileIds.Count}），" +
+                       $"重试时禁用镜像源（第 {tryCount} 次）");
+            if (tryCount > 3)
+                throw new Exception(Lang.Text("Minecraft.Download.Modpack.SomeModsDeleted"));
+        } while (true);
+
+        // 写进共享数组：DeepClone 是因为这些节点还挂在响应文档上，带父节点直接 Add 会抛异常。
+        sink.Clear();
+        foreach (var node in files)
+            sink.Add(node?.DeepClone());
+        task.output = sink;
     }
 
     private static List<DownloadFile> _BuildCurseForgeDownloadFiles(
         LoaderTask<JsonArray, List<DownloadFile>> task,
-        List<CurseForgeModRef> modList,
+        JsonArray modFiles,
+        List<int> modList,
         List<int> modOptionalList,
         JsonObject json,
         string instanceName,
         Comp.CompLoaderType modLoader)
     {
         var fileList = new Dictionary<int, DownloadFile>();
-        foreach (var modJson in task.input!.OfType<JsonObject>())
+        var candidateCount = 0;
+        var emptyNameCount = 0;
+        var noUrlCount = 0;
+        var minecraftVersion = json["minecraft"]!["version"]!.ToString();
+        var installFolder = $@"{GameFolders.mcFolderSelected}versions\{instanceName}\";
+
+        // 优先读闭包里的数组；万一没写进去（加载器被重启等），再退回加载器输入。
+        var source = modFiles.Count != 0 ? modFiles : task.input;
+        foreach (var modJson in source?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
         {
+            candidateCount += 1;
             // 上游响应偶尔缺 id；用负数补位，避免几条记录都落到同一个键上互相覆盖
             var id = _TryGetModId(modJson["id"], out var parsedId) ? parsedId : -fileList.Count - 1;
             if (fileList.ContainsKey(id))
@@ -456,21 +400,78 @@ public static partial class Modpack
                 continue;
 
             var (targetFolder, type) = _ResolveCurseForgeTargetFolder(modJson);
+            var localAddress = $@"{installFolder}{targetFolder}\";
             var file = new Comp.CompFile(modJson, type);
-            if (!file.Available)
+            if (file.Available)
+            {
+                fileList.Add(
+                    id,
+                    file.ToNetFile(
+                        localAddress,
+                        Comp.DownloadReason.ModPack,
+                        minecraftVersion,
+                        modLoader));
+                task.Progress += 1d / (1 + modList.Count);
                 continue;
+            }
+
+            // 兜底：CompFile 认为下载信息不全时，只要还有文件名，就自己按 fileId 拼 CurseForge CDN 地址。
+            // 少了这一步，镜像少给一个 downloadUrl 就会让整个整合包「一个模组都不下载」。
+            if (string.IsNullOrEmpty(file.FileName))
+            {
+                emptyNameCount += 1;
+                Common.Log($"[Modpack] 跳过模组文件 {id}：响应里没有文件名");
+                continue;
+            }
+
+            var fallbackUrls = _BuildCurseForgeFallbackUrls(id, file.FileName);
+            if (fallbackUrls.Count == 0)
+            {
+                noUrlCount += 1;
+                Common.Log($"[Modpack] 跳过模组文件 {id}：无法推出下载地址");
+                continue;
+            }
 
             fileList.Add(
                 id,
-                file.ToNetFile(
-                    $@"{GameFolders.mcFolderSelected}versions\{instanceName}\{targetFolder}\",
-                    Comp.DownloadReason.ModPack,
-                    json["minecraft"]!["version"]!.ToString(),
-                    modLoader));
+                new DownloadFile(
+                    Comp.CompFile.HandleModrinthDownloadUrls(
+                        fallbackUrls,
+                        Comp.DownloadReason.ModPack,
+                        minecraftVersion,
+                        modLoader),
+                    localAddress + Comp.CompFileNameSanitize(file.FileName),
+                    new Common.FileChecker(hash: file.Hash),
+                    true));
+            Common.Log($"[Modpack] 模组文件 {id} 缺下载地址，改用 CDN 兜底：{fallbackUrls[0]}");
             task.Progress += 1d / (1 + modList.Count);
         }
 
+        Common.Log(
+            $"[Modpack] 模组文件共 {candidateCount} 条，可用 {fileList.Count} 条"
+            + (emptyNameCount + noUrlCount == 0
+                ? ""
+                : $"（缺文件名 {emptyNameCount} 条，无可用下载地址 {noUrlCount} 条）"));
+
+        // 拿到了文件信息却一条任务都没构造出来，说明字段与预期不符。
+        // 这里必须报错：静默「安装成功但没装模组」比失败更难排查。
+        if (fileList.Count == 0 && candidateCount != 0)
+            throw new Exception(Lang.Text("Minecraft.Download.Modpack.SomeModsDeleted"));
+
         return [.. fileList.Values];
+    }
+
+    /// <summary>
+    ///     按 CurseForge CDN 的目录规则拼兜底下载地址：fileId 除 1000 为目录、余数为文件名编号。
+    /// </summary>
+    private static List<string> _BuildCurseForgeFallbackUrls(int fileId, string fileName)
+    {
+        if (fileId <= 0)
+            return [];
+
+        var url =
+            $"https://edge.forgecdn.net/files/{fileId / 1000}/{fileId % 1000}/{Uri.EscapeDataString(fileName)}";
+        return GameDownload.DlSourceModDownloadGet(Comp.CompFile.HandleCurseForgeDownloadUrls(url));
     }
 
     private static (string Folder, Comp.CompType Type) _ResolveCurseForgeTargetFolder(
@@ -485,7 +486,8 @@ public static partial class Modpack
             .ToList();
         if (moduleNames.Contains("META-INF")
             || moduleNames.Contains("mcmod.info")
-            || (modJson["FileName"]?.ToString()?.EndsWithF(".jar", true)).GetValueOrDefault())
+            // CurseForge 返回的字段名是小驼峰 fileName，写成 FileName 永远匹配不到 .jar
+            || (modJson["fileName"]?.ToString()?.EndsWithF(".jar", true)).GetValueOrDefault())
             return ("mods", Comp.CompType.Mod);
         if (moduleNames.Contains("pack.mcmeta"))
             return ("resourcepacks", Comp.CompType.ResourcePack);
