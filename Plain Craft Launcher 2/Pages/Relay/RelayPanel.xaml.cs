@@ -32,6 +32,8 @@ public partial class RelayPanel : UserControl
     private bool _versionTooLow;
     private RelayMe? _lastMe;
     private bool _phonePrompted;
+    // 服务端按来源 IP 判定不在中国大陆时为 true：登录与分配都禁用。
+    private bool _regionBlocked;
 
     public RelayPanel()
     {
@@ -47,7 +49,8 @@ public partial class RelayPanel : UserControl
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         _timer.Tick += async (_, _) =>
         {
-            if (!IsVisible || !_session.IsValid || _busy) return;
+            // 地区受限时不再刷新：既没有可用功能，也没必要每分钟去问一次属地
+            if (!IsVisible || !_session.IsValid || _busy || _regionBlocked) return;
             await RefreshAsync().ConfigureAwait(true);
         };
     }
@@ -74,7 +77,7 @@ public partial class RelayPanel : UserControl
             }
 
             // 再次进来时刷新一下配额，端口可能已经在别处被释放了。
-            if (_session.IsValid) await RefreshAsync().ConfigureAwait(true);
+            if (_session.IsValid && !_regionBlocked) await RefreshAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -86,7 +89,14 @@ public partial class RelayPanel : UserControl
 
     private async Task InitializeAsync()
     {
-        await CheckVersionAsync().ConfigureAwait(true);
+        await CheckAccessAsync().ConfigureAwait(true);
+        if (_regionBlocked)
+        {
+            // 地区受限时不再走登录流程：让用户白填邮箱和验证码没有意义
+            ShowRegionBlocked();
+            return;
+        }
+
         if (_session.IsValid)
         {
             ShowLoggedIn();
@@ -101,27 +111,53 @@ public partial class RelayPanel : UserControl
     }
 
     /// <summary>
-    ///     版本门槛预检：云端后台设了「联机客户端版本号」时，客户端版本必须完全一致，
-    ///     不一致（无论高低）都提示版本过低、需要更新，并禁用分配按钮。
-    ///     拿不到状态不拦功能——真正分配时服务端还会再校验一次。
+    ///     进页面时向云端取一次准入状态：版本门槛与地区限制都在这一次请求里完成。
+    ///     <para>
+    ///         地区判定由服务端按请求来源 IP 完成（客户端不自己上报 IP，避免可伪造）。
+    ///         这个请求必须限时：联机页是可操作页面，外部属地接口抖动不能把界面卡在这里。
+    ///         超时按「不限制」处理，真正分配端口时服务端还会再校验一次。
+    ///     </para>
     /// </summary>
-    private async Task CheckVersionAsync()
+    private async Task CheckAccessAsync()
     {
         try
         {
-            var status = await _api.GetStatusAsync().ConfigureAwait(true);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            var status = await _api.GetStatusAsync(cts.Token).ConfigureAwait(true);
+
             var required = status.RequiredVersion?.Trim();
             _versionTooLow = !string.IsNullOrEmpty(required) && required != Basics.VersionName;
             if (_versionTooLow) SetStatus("版本过低，需要更新");
+
+            _regionBlocked = status.RegionCheck && !status.RegionAllowed;
+            ApplyRegionState(status.Region);
         }
-        catch (Exception)
+        catch (OperationCanceledException)
+        {
+            // 超时：不改变判定，分配时由服务端兜底
+            Common.Log("[Relay] 获取联机准入状态超时，跳过本地预检", Common.LogLevel.Debug);
+        }
+        catch (Exception ex)
         {
             // 状态接口失败不改变既有判定，分配时服务端兜底
+            Common.Log("[Relay] 获取联机准入状态失败：" + ex.Message, Common.LogLevel.Debug);
         }
         finally
         {
             UpdateButtons();
         }
+    }
+
+    /// <summary>把地区判定结果刷到界面上：受限时显示提示卡片，恢复后收起。</summary>
+    private void ApplyRegionState(string? region)
+    {
+        // 两种方向都要处理：管理员中途关掉限制后，卡片不能留在页面上
+        PanRegionBlocked.Visibility = _regionBlocked ? Visibility.Visible : Visibility.Collapsed;
+        if (!_regionBlocked) return;
+
+        SetStatus(string.IsNullOrWhiteSpace(region)
+            ? "当前可能位于非中国大陆地区，暂时无法使用此功能"
+            : $"当前可能位于非中国大陆地区（识别为 {region}），暂时无法使用此功能");
     }
 
     // ---------------------------------------------------------------- 登录
@@ -302,7 +338,8 @@ public partial class RelayPanel : UserControl
     {
         // 防重入：60 秒轮询、切页、手动操作都可能触发刷新，
         // 网络慢时上一次还没回来，再叠一次只会让请求互相拖慢。
-        if (!_session.IsValid || _refreshing) return;
+        // 地区受限时也没有可刷新的内容。
+        if (!_session.IsValid || _refreshing || _regionBlocked) return;
         _refreshing = true;
         try
         {
@@ -407,6 +444,11 @@ public partial class RelayPanel : UserControl
 
     private async void BtnAllocate_Click(object sender, MouseButtonEventArgs e)
     {
+        if (_regionBlocked)
+        {
+            SetStatus("当前可能位于非中国大陆地区，暂时无法使用此功能");
+            return;
+        }
         if (_versionTooLow)
         {
             SetStatus("版本过低，需要更新");
@@ -472,6 +514,13 @@ public partial class RelayPanel : UserControl
             SetStatus($"隧道已建立：{result.Allocation.GameAddress}（本地 {localPort}）");
             ApplyQuota(result.Quota);
             await RefreshAsync().ConfigureAwait(true);
+        }
+        catch (RelayApiException ex) when (IsRegionBlocked(ex))
+        {
+            // 页面打开后换了网络（例如切到境外线路）时，服务端会在这里拦下来。
+            // 此时把界面切到受限态，避免用户反复点「分配并启动」。
+            _regionBlocked = true;
+            ApplyRegionState(null);
         }
         catch (Exception ex)
         {
@@ -680,15 +729,38 @@ public partial class RelayPanel : UserControl
         UpdateButtons();
     }
 
-    /// <summary>封禁、没有节点、版本过低、正在忙碌时，分配按钮都不能点。</summary>
+    /// <summary>
+    ///     地区受限时的界面：收起登录与配额区，只保留提示。
+    ///     <para>
+    ///         已经建立的隧道不主动断开——那会把正在进行中的游戏直接打断，
+    ///         这里只保证不再新建；停止按钮保留，让用户自己决定何时停。
+    ///     </para>
+    /// </summary>
+    private void ShowRegionBlocked()
+    {
+        PanLogin.Visibility = Visibility.Collapsed;
+        PanQuota.Visibility = Visibility.Collapsed;
+        BtnLogout.Visibility = Visibility.Collapsed;
+        BtnBindPhone.Visibility = Visibility.Collapsed;
+        BtnStop.Visibility = _runner is null ? Visibility.Collapsed : Visibility.Visible;
+        ListPorts.ItemsSource = null;
+        LabEmpty.Visibility = Visibility.Collapsed;
+        PanRegionBlocked.Visibility = Visibility.Visible;
+        _lastMe = null;
+        _phonePrompted = true; // 地区受限时不再弹绑定手机号
+        UpdateButtons();
+    }
+
+    /// <summary>封禁、没有节点、版本过低、地区受限、正在忙碌时，分配按钮都不能点。</summary>
     private void UpdateButtons()
     {
-        BtnAllocate.IsEnabled = !_busy && !_banned && _hasNodes && !_versionTooLow;
-        ComboNodes.IsEnabled = !_banned && _hasNodes;
+        BtnAllocate.IsEnabled = !_busy && !_banned && _hasNodes && !_versionTooLow && !_regionBlocked;
+        ComboNodes.IsEnabled = !_banned && _hasNodes && !_regionBlocked;
         BtnLogout.IsEnabled = !_busy;
-        BtnRefreshCaptcha.IsEnabled = !_busy;
-        BtnSendCode.IsEnabled = !_busy;
-        BtnLogin.IsEnabled = !_busy;
+        // 地区受限时连登录都禁用，避免用户以为登录之后就能用
+        BtnRefreshCaptcha.IsEnabled = !_busy && !_regionBlocked;
+        BtnSendCode.IsEnabled = !_busy && !_regionBlocked;
+        BtnLogin.IsEnabled = !_busy && !_regionBlocked;
     }
 
     private void SetStatus(string text) => LabStatus.Text = text;
@@ -721,6 +793,11 @@ public partial class RelayPanel : UserControl
         if (digits.Length >= 7) return digits[..2] + "****" + digits[^3..];
         return "****";
     }
+
+    /// <summary>服务端按来源 IP 判定地区不允许时返回 403 + region_blocked。</summary>
+    private static bool IsRegionBlocked(RelayApiException ex) =>
+        ex.Status == System.Net.HttpStatusCode.Forbidden &&
+        (ex.Body?.Contains("region_blocked", StringComparison.Ordinal) ?? false);
 
     /// <summary>列表项包装：直接绑 RelayAllocation 的话 UsageText 没地方放。</summary>
     public sealed class PortItem

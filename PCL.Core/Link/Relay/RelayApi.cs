@@ -224,6 +224,8 @@ public sealed class RelayApi
         "node_offline" => "该节点已离线，请换一个",
         "no_port_available" => "该节点端口已分配完，请换一个",
         "version_too_low" => "版本过低，需要更新",
+        // 服务端按来源 IP 判定不在中国大陆时返回；文案由服务端下发，这里只是兜底
+        "region_blocked" => "当前可能位于非中国大陆地区，暂时无法使用此功能",
         "unauthorized" => "登录已失效，请重新登录",
         _ => status == HttpStatusCode.Unauthorized ? "登录已失效，请重新登录" : $"请求失败（{code}）"
     };

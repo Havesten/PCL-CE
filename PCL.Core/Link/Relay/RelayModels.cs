@@ -121,7 +121,13 @@ public sealed record RelayStatus(
     [property: JsonPropertyName("turnstile")] bool Turnstile,
     [property: JsonPropertyName("node_count")] int NodeCount,
     [property: JsonPropertyName("dev_mode")] bool DevMode,
-    [property: JsonPropertyName("required_version")] string? RequiredVersion = null);
+    [property: JsonPropertyName("required_version")] string? RequiredVersion = null,
+    // 地区限制：region_check 为 true 表示服务端启用了该限制；
+    // region_allowed 为 false 时客户端应直接禁用联机功能。
+    // 两个字段都缺省为「不限制」，老服务端不会把客户端拦下来。
+    [property: JsonPropertyName("region_check")] bool RegionCheck = false,
+    [property: JsonPropertyName("region_allowed")] bool RegionAllowed = true,
+    [property: JsonPropertyName("region")] string? Region = null);
 
 internal sealed record RelayErrorBody(
     [property: JsonPropertyName("error")] string? Error,

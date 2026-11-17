@@ -13,6 +13,16 @@
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </DockPanel>
 
+        <!-- 地区限制：服务端按来源 IP 判定不在中国大陆时显示，此时登录与分配都不可用 -->
+        <local:MyCard x:Name="PanRegionBlocked" Margin="0,0,0,10" Title="地区限制" Visibility="Collapsed">
+            <StackPanel Margin="14,32,14,14">
+                <TextBlock Text="当前可能位于非中国大陆地区，暂时无法使用此功能" TextWrapping="Wrap"
+                           FontSize="14" FontWeight="SemiBold" />
+                <TextBlock Margin="0,8,0,0" Opacity="0.7" TextWrapping="Wrap"
+                           Text="中继联机服务仅面向中国大陆地区开放。如果你确实在中国大陆，可能是网络出口被判定了其他地区，可以尝试更换网络后重新打开本页。" />
+            </StackPanel>
+        </local:MyCard>
+
         <!-- 登录状态 -->
         <local:MyCard Margin="0,0,0,10" Title="登录状态">
             <StackPanel Margin="14,32,14,14">
