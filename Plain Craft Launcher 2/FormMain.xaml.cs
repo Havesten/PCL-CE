@@ -1475,7 +1475,7 @@ public partial class FormMain
 
         ToolsTest = 3,
 
-        LinkP2P = 0, // 已从导航撤下，仅保留页面实现
+        LinkP2P = 0,
         LinkRelay = 1,
 
         VersionOverall = 0,
@@ -1893,7 +1893,7 @@ public partial class FormMain
                         PageChangeAnim(Launcher.frmToolsLeft, (FrameworkElement)Launcher.frmToolsLeft.PageGet(subType));
                         break;
                     }
-                case PageType.Link: // 联机（中继）
+                case PageType.Link: // 联机（P2P 与中继）
                     {
                         Launcher.frmLinkLeft ??= new PageLinkLeft();
                         subType = Launcher.frmLinkLeft.pageID;

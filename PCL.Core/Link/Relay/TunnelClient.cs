@@ -45,9 +45,13 @@ public sealed class TunnelClient : IDisposable
     private readonly RelayTunnel _tunnel;
     private readonly int _localPort;
     private readonly string _label;
+    private readonly TimeSpan _pingInterval;
 
-    private TcpClient? _control;
-    private NetworkStream? _controlStream;
+    private readonly object _stateLock = new();
+    private ControlConnection? _connection;
+    private Task? _controlTask;
+    private volatile bool _connected;
+    private int _cleanupStarted;
     private CancellationTokenSource? _cts;
 
     // 数据连接任务表：只增不删会无限涨内存——完成后必须移除。
@@ -58,158 +62,207 @@ public sealed class TunnelClient : IDisposable
     private int _disposed;
 
     public TunnelClient(RelayTunnel tunnel, int localPort, string label)
+        : this(tunnel, localPort, label, PingInterval)
+    {
+    }
+
+    internal TunnelClient(RelayTunnel tunnel, int localPort, string label, TimeSpan pingInterval)
     {
         _tunnel = tunnel;
         _localPort = localPort;
         _label = string.IsNullOrWhiteSpace(label) ? "pcl-relay" : label;
+        _pingInterval = pingInterval;
     }
 
-    public bool IsRunning => _running && _control is { Connected: true };
+    private sealed class ControlConnection(TcpClient client, CancellationToken ct) : IDisposable
+    {
+        private int _disposed;
+        public TcpClient Client { get; } = client;
+        public NetworkStream Stream { get; } = client.GetStream();
+        public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        public SemaphoreSlim Writer { get; } = new(1, 1);
+        public void Stop()
+        {
+            try { Cancellation.Cancel(); } catch (ObjectDisposedException) { }
+            Client.Dispose();
+        }
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            Stop();
+            Cancellation.Dispose();
+            Writer.Dispose();
+        }
+    }
 
-    /// <summary>
-    ///     启动隧道。成功返回 null，失败返回原因。
-    ///     云端分配的令牌要等节点下一次轮询 state（默认 5 秒）才会进入绑定表，
-    ///     所以 AUTH 被拒（无效令牌）并不一定是真失败：在超时预算内间隔重试，等绑定表收敛。
-    /// </summary>
+    public bool IsRunning => _running;
+    public bool IsConnected => _connected;
+
     public async Task<string?> StartAsync(TimeSpan timeout, CancellationToken ct = default)
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var token = _cts.Token;
-        var deadline = DateTime.UtcNow + timeout;
-        var lastError = "连接超时";
-
-        while (true)
+        lock (_stateLock)
         {
-            try
+            if (_disposed != 0) return "隧道已关闭";
+            if (_cts != null) return "隧道已经启动";
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        }
+        try
+        {
+            var connection = await ConnectWithRetryAsync(timeout, _cts.Token).ConfigureAwait(false);
+            lock (_stateLock)
             {
-                // 1. 连接控制端口
-                var remaining = deadline - DateTime.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                    return lastError;
-                _control = new TcpClient { NoDelay = true };
-                using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                connectCts.CancelAfter(remaining);
-                await _control.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, connectCts.Token).ConfigureAwait(false);
-                _controlStream = _control.GetStream();
-
-                // 2. AUTH
-                await WriteFrame(_controlStream, FrameAuth, System.Text.Encoding.UTF8.GetBytes(_tunnel.Token), token).ConfigureAwait(false);
-                var (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
-                if (typ == FrameErr)
+                if (_disposed != 0 || _cts.IsCancellationRequested)
                 {
-                    lastError = "鉴权失败：" + System.Text.Encoding.UTF8.GetString(payload);
-                    // 令牌未同步到节点的绑定表是常态（分配与轮询之间的竞态），释放本连接后在预算内重试。
-                    _CloseControl();
-                    if (DateTime.UtcNow + AuthRetryDelay >= deadline)
-                        return lastError;
-                    await Task.Delay(AuthRetryDelay, token).ConfigureAwait(false);
-                    continue;
+                    connection.Dispose();
+                    throw new OperationCanceledException(_cts.Token);
                 }
-                if (typ != FrameOk)
-                    return $"意外的响应帧 0x{typ:X2}";
-
-                // 3. REGISTER（端口与令牌强绑定，失败是确定性错误，不重试）
-                var portBuf = new byte[2];
-                BinaryPrimitives.WriteUInt16BigEndian(portBuf, (ushort)_tunnel.RemotePort);
-                await WriteFrame(_controlStream, FrameRegister, portBuf, token).ConfigureAwait(false);
-                (typ, payload) = await ReadFrame(_controlStream, token).ConfigureAwait(false);
-                if (typ == FrameErr)
-                    return "注册失败：" + System.Text.Encoding.UTF8.GetString(payload);
-                if (typ != FrameOk)
-                    return $"意外的响应帧 0x{typ:X2}";
-
                 _running = true;
-
-                // 4. 后台监听 NEW_CONN / PING
-                _ = Task.Run(() => ControlLoop(token), token);
-                // 5. 心跳：服务端 90 秒收不到帧就踢线，必须主动 PING
-                _ = Task.Run(() => PingLoop(token), token);
-
-                return null; // 成功
+                _connected = true;
+                _connection = connection;
+                _controlTask = Task.Run(() => RunSessionAsync(connection, _cts.Token));
             }
-            catch (OperationCanceledException)
-            {
-                _CloseControl();
-                return lastError;
-            }
-            catch (Exception ex)
-            {
-                _CloseControl();
-                return "隧道连接失败：" + ex.Message;
-            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _running = false;
+            await CleanupAsync().ConfigureAwait(false);
+            return ex is OperationCanceledException ? "隧道连接已取消或超时" : ex.Message;
         }
     }
 
-    /// <summary>关闭并释放控制连接（重试与失败路径共用）。</summary>
-    private void _CloseControl()
+    private async Task<ControlConnection> ConnectWithRetryAsync(TimeSpan timeout, CancellationToken ct)
     {
-        _controlStream = null;
-        _control?.Dispose();
-        _control = null;
+        var deadline = DateTime.UtcNow + timeout;
+        Exception? lastError = null;
+        while (!ct.IsCancellationRequested)
+        {
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero) break;
+            try { return await ConnectControlAsync(remaining, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex) { lastError = ex; }
+            remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero) break;
+            await Task.Delay(remaining < AuthRetryDelay ? remaining : AuthRetryDelay, ct).ConfigureAwait(false);
+        }
+        ct.ThrowIfCancellationRequested();
+        throw new IOException(lastError?.Message ?? "隧道连接超时", lastError);
     }
 
-    /// <summary>
-    ///     心跳循环：定期发 PING 保活。
-    /// </summary>
-    private async Task PingLoop(CancellationToken ct)
+    private async Task<ControlConnection> ConnectControlAsync(TimeSpan timeout, CancellationToken ct)
+    {
+        var client = new TcpClient { NoDelay = true };
+        try
+        {
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            budget.CancelAfter(timeout); // 连接、AUTH、REGISTER 共用完整超时预算
+            var token = budget.Token;
+            await client.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, token).ConfigureAwait(false);
+            var stream = client.GetStream();
+            await WriteFrame(stream, FrameAuth, System.Text.Encoding.UTF8.GetBytes(_tunnel.Token), token).ConfigureAwait(false);
+            var (typ, payload) = await ReadFrame(stream, token).ConfigureAwait(false);
+            if (typ == FrameErr) throw new IOException("鉴权失败：" + System.Text.Encoding.UTF8.GetString(payload));
+            if (typ != FrameOk) throw new InvalidDataException($"意外的响应帧 0x{typ:X2}");
+            var port = new byte[2];
+            BinaryPrimitives.WriteUInt16BigEndian(port, (ushort)_tunnel.RemotePort);
+            await WriteFrame(stream, FrameRegister, port, token).ConfigureAwait(false);
+            (typ, payload) = await ReadFrame(stream, token).ConfigureAwait(false);
+            if (typ == FrameErr) throw new IOException("注册失败：" + System.Text.Encoding.UTF8.GetString(payload));
+            if (typ != FrameOk) throw new InvalidDataException($"意外的响应帧 0x{typ:X2}");
+            return new ControlConnection(client, ct);
+        }
+        catch { client.Dispose(); throw; }
+    }
+
+    private async Task RunSessionAsync(ControlConnection connection, CancellationToken ct)
     {
         try
         {
-            while (!ct.IsCancellationRequested && _controlStream is { } stream)
+            while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(PingInterval, ct).ConfigureAwait(false);
-                if (!ct.IsCancellationRequested && _running)
-                    await WriteFrame(stream, FramePing, BitConverter.GetBytes(Environment.TickCount64), ct).ConfigureAwait(false);
-            }
-        }
-        catch (Exception)
-        {
-            // 连接断开，ControlLoop 会收口
-        }
-    }
-
-    /// <summary>
-    ///     控制连接主循环：接收 NEW_CONN 信号、响应 PING。
-    /// </summary>
-    private async Task ControlLoop(CancellationToken ct)
-    {
-        try
-        {
-            while (!ct.IsCancellationRequested && _controlStream is { } stream)
-            {
-                var (typ, payload) = await ReadFrame(stream, ct).ConfigureAwait(false);
-                switch (typ)
+                _connected = true;
+                lock (_stateLock) _connection = connection;
+                var ping = PingLoop(connection);
+                try { await ControlLoop(connection).ConfigureAwait(false); }
+                catch (Exception) { /* 瞬时网络错误由下面的重连处理 */ }
+                finally
                 {
-                    case FrameNewConn:
-                        if (payload.Length < 4) break;
-                        var connId = BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(0, 4));
-                        StartDataConnection(connId, ct);
-                        break;
-
-                    case FramePing:
-                        // 回 PONG
-                        await WriteFrame(stream, FramePong, payload, ct).ConfigureAwait(false);
-                        break;
-
-                    case FramePong:
-                        // 心跳响应，忽略
-                        break;
-
-                    case FrameErr:
-                        // 服务端踢了我们
-                        _running = false;
-                        return;
+                    _connected = false;
+                    connection.Stop();
+                    try { await ping.ConfigureAwait(false); } catch (Exception) { }
+                    lock (_stateLock) { if (_connection == connection) _connection = null; }
+                    connection.Dispose();
                 }
+                if (ct.IsCancellationRequested) break;
+                // 更新重启、NAT 断开等情况下自动重新注册同一分配，保持原公网地址。
+                connection = await ConnectWithRetryAsync(TimeSpan.FromSeconds(90), ct).ConfigureAwait(false);
             }
         }
-        catch (Exception)
-        {
-            // 连接断开
-        }
+        catch (Exception) { /* 重连预算耗尽或用户停止 */ }
         finally
         {
             _running = false;
+            _connected = false;
+            connection.Dispose();
+            await CleanupAsync().ConfigureAwait(false);
         }
+    }
+
+    private static async Task WriteControl(ControlConnection connection, byte typ, byte[] payload)
+    {
+        var ct = connection.Cancellation.Token;
+        await connection.Writer.WaitAsync(ct).ConfigureAwait(false);
+        try { await WriteFrame(connection.Stream, typ, payload, ct).ConfigureAwait(false); }
+        finally { connection.Writer.Release(); }
+    }
+
+    private async Task PingLoop(ControlConnection connection)
+    {
+        var ct = connection.Cancellation.Token;
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(_pingInterval, ct).ConfigureAwait(false);
+                await WriteControl(connection, FramePing, BitConverter.GetBytes(Environment.TickCount64)).ConfigureAwait(false);
+            }
+        }
+        catch (Exception) { connection.Stop(); }
+    }
+
+    private async Task ControlLoop(ControlConnection connection)
+    {
+        var ct = connection.Cancellation.Token;
+        while (!ct.IsCancellationRequested)
+        {
+            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            readTimeout.CancelAfter(TimeSpan.FromSeconds(90));
+            var (typ, payload) = await ReadFrame(connection.Stream, readTimeout.Token).ConfigureAwait(false);
+            switch (typ)
+            {
+                case FrameNewConn:
+                    if (payload.Length != 6 || BinaryPrimitives.ReadUInt16BigEndian(payload.AsSpan(4, 2)) != _tunnel.RemotePort) break;
+                    StartDataConnection(BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(0, 4)), ct);
+                    break;
+                case FramePing:
+                    await WriteControl(connection, FramePong, payload).ConfigureAwait(false);
+                    break;
+                case FrameErr:
+                    return;
+            }
+        }
+    }
+
+    private async Task CleanupAsync()
+    {
+        if (Interlocked.Exchange(ref _cleanupStarted, 1) != 0) return;
+        try { _cts?.Cancel(); } catch (ObjectDisposedException) { }
+        lock (_stateLock) { _connection?.Stop(); _connection = null; }
+        try { await Task.WhenAll(_dataTasks.Keys).ConfigureAwait(false); } catch (Exception) { }
+        _dataTasks.Clear();
+        _dataGate.Dispose();
+        _cts?.Dispose();
     }
 
     /// <summary>
@@ -218,6 +271,7 @@ public sealed class TunnelClient : IDisposable
     private void StartDataConnection(uint connId, CancellationToken ct)
     {
         // 先清理已完成的任务，防止字典无限增长
+        if (ct.IsCancellationRequested || _disposed != 0) return;
         ReapCompleted();
 
         if (!_dataGate.Wait(0))
@@ -236,7 +290,7 @@ public sealed class TunnelClient : IDisposable
             {
                 _dataGate.Release();
             }
-        }, ct);
+        });
 
         _dataTasks.TryAdd(task, 0);
         _ = task.ContinueWith(t =>
@@ -262,6 +316,9 @@ public sealed class TunnelClient : IDisposable
         // 每条数据连接独立取消域：任一方向结束，整条链路拆除
         using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = linkCts.Token;
+        using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        connectCts.CancelAfter(TimeSpan.FromSeconds(10));
+        var connectToken = connectCts.Token;
 
         TcpClient? dataConn = null;
         TcpClient? gameConn = null;
@@ -269,21 +326,22 @@ public sealed class TunnelClient : IDisposable
         {
             // 连接服务端（新 TCP 连接）
             dataConn = new TcpClient { NoDelay = true };
-            await dataConn.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, token).ConfigureAwait(false);
+            await dataConn.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, connectToken).ConfigureAwait(false);
             var dataStream = dataConn.GetStream();
 
             // BIND
             var idBuf = new byte[4];
             BinaryPrimitives.WriteUInt32BigEndian(idBuf, connId);
-            await WriteFrame(dataStream, FrameBind, idBuf, token).ConfigureAwait(false);
+            await WriteFrame(dataStream, FrameBind, idBuf, connectToken).ConfigureAwait(false);
 
-            var (typ, _) = await ReadFrame(dataStream, token).ConfigureAwait(false);
+            var (typ, _) = await ReadFrame(dataStream, connectToken).ConfigureAwait(false);
             if (typ != FrameOk) return;
 
             // 连接本地游戏服
             gameConn = new TcpClient { NoDelay = true };
-            await gameConn.ConnectAsync("127.0.0.1", _localPort, token).ConfigureAwait(false);
+            await gameConn.ConnectAsync("127.0.0.1", _localPort, connectToken).ConfigureAwait(false);
             var gameStream = gameConn.GetStream();
+            connectCts.CancelAfter(Timeout.InfiniteTimeSpan);
 
             // 双向桥接：任一方向结束即取消另一个
             var t1 = Pump(dataStream, gameStream, token);
@@ -369,10 +427,7 @@ public sealed class TunnelClient : IDisposable
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
         _running = false;
         try { _cts?.Cancel(); } catch (ObjectDisposedException) { /* ignore */ }
-        _control?.Dispose();
-        _control = null;
-        _controlStream = null;
-        _dataGate.Dispose();
-        _dataTasks.Clear();
+        lock (_stateLock) _connection?.Stop();
+        // 后台循环在数据任务退出后统一释放信号量，避免 Release 与 Dispose 竞态。
     }
 }

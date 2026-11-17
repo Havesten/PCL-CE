@@ -5,8 +5,7 @@ using PCL.Core.App.Localization;
 namespace PCL;
 
 /// <summary>
-///     联机页左侧导航。P2P 直连页已从导航中撤下（页面代码保留在 <see cref="PageLinkP2P" />），
-///     目前只暴露中继联机；需要恢复时把 PageLinkLeft.xaml 里注释掉的 ItemP2P 加回来即可。
+///     联机页左侧导航，提供 P2P 直连与中继联机两种方式。
 /// </summary>
 public partial class PageLinkLeft : IPageView
 {
@@ -34,7 +33,8 @@ public partial class PageLinkLeft : IPageView
     {
         if (_isLoad || _isPageSwitched) return;
         _isLoad = true;
-        ItemRelay.SetChecked(true, false, false);
+        var item = pageID == FormMain.PageSubType.LinkP2P ? ItemP2P : ItemRelay;
+        item.SetChecked(true, false, false);
     }
 
     private void PageCheck(object senderRaw, Common.RouteEventArgs e)
@@ -67,8 +67,6 @@ public partial class PageLinkLeft : IPageView
 
     public void PageChange(FormMain.PageSubType id)
     {
-        // P2P 页已从导航中撤下，任何指向它的切换都回落到中继联机，避免出现没有导航项的空白状态
-        if (id == FormMain.PageSubType.LinkP2P) id = FormMain.PageSubType.LinkRelay;
         if (pageID == id) return;
         Animations.AniBeginControl();
         _isPageSwitched = true;

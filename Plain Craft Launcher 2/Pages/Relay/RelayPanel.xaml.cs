@@ -156,7 +156,7 @@ public partial class RelayPanel : UserControl
             if (_versionTooLow) SetStatus("版本过低，需要更新");
 
             _regionBlocked = status.RegionCheck && !status.RegionAllowed;
-            ApplyRegionState(status.Region);
+            ApplyRegionState();
         }
         catch (OperationCanceledException)
         {
@@ -175,15 +175,13 @@ public partial class RelayPanel : UserControl
     }
 
     /// <summary>把地区判定结果刷到界面上：受限时显示提示卡片，恢复后收起。</summary>
-    private void ApplyRegionState(string? region)
+    private void ApplyRegionState()
     {
         // 两种方向都要处理：管理员中途关掉限制后，卡片不能留在页面上
         PanRegionBlocked.Visibility = _regionBlocked ? Visibility.Visible : Visibility.Collapsed;
         if (!_regionBlocked) return;
 
-        SetStatus(string.IsNullOrWhiteSpace(region)
-            ? "当前可能位于非中国大陆地区，暂时无法使用此功能"
-            : $"当前可能位于非中国大陆地区（识别为 {region}），暂时无法使用此功能");
+        SetStatus("当前可能位于非中国大陆地区，暂时无法使用此功能");
     }
 
     // ---------------------------------------------------------------- 登录
@@ -546,7 +544,7 @@ public partial class RelayPanel : UserControl
             // 页面打开后换了网络（例如切到境外线路）时，服务端会在这里拦下来。
             // 此时把界面切到受限态，避免用户反复点「分配并启动」。
             _regionBlocked = true;
-            ApplyRegionState(null);
+            ApplyRegionState();
         }
         catch (Exception ex)
         {
