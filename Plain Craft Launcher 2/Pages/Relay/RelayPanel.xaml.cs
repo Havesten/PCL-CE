@@ -76,8 +76,25 @@ public partial class RelayPanel : UserControl
                 return;
             }
 
-            // 再次进来时刷新一下配额，端口可能已经在别处被释放了。
-            if (_session.IsValid && !_regionBlocked) await RefreshAsync().ConfigureAwait(true);
+            // 再次进来时先重新确认准入：管理员可能刚开关了地区限制，用户也可能换了网络，
+            // 不能因为首次进入被拦过就一直停在受限态。服务端有缓存，这一步成本很低。
+            var wasBlocked = _regionBlocked;
+            await CheckAccessAsync().ConfigureAwait(true);
+            if (_regionBlocked)
+            {
+                ShowRegionBlocked();
+                return;
+            }
+
+            if (wasBlocked)
+            {
+                // 刚从受限态恢复：界面是被收起过的，需要按当前登录状态重建
+                await EnterAvailableUiAsync().ConfigureAwait(true);
+                return;
+            }
+
+            // 正常再进入：只刷新配额，不重取人机验证（否则用户填到一半的答案会失效）
+            if (_session.IsValid) await RefreshAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -97,6 +114,15 @@ public partial class RelayPanel : UserControl
             return;
         }
 
+        await EnterAvailableUiAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     进入「可用」界面：已登录就显示配额并刷新，否则显示登录表单。
+    ///     首次初始化与「地区限制解除后恢复」走同一套逻辑，避免两边状态不一致。
+    /// </summary>
+    private async Task EnterAvailableUiAsync()
+    {
         if (_session.IsValid)
         {
             ShowLoggedIn();
