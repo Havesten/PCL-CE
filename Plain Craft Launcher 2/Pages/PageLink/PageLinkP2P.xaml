@@ -7,8 +7,26 @@
                           x:Name="PanBack">
         <StackPanel Margin="25,10">
 
-            <local:MyCard Margin="0,15,0,10" Title="联机方式">
+            <local:MyCard Margin="0,15,0,10" Title="NAT 类型检测">
                 <StackPanel Margin="25,40,25,18">
+                    <TextBlock Text="双方都没有独立公网 IP 时，通过会合节点交换地址，再由 EasyTier 尝试打洞。请双方分别检测，NAT 类型只反映本机条件，最终以实际连接为准。"
+                               TextWrapping="Wrap" Opacity="0.7" />
+                    <local:MyButton x:Name="BtnDetectNat" Text="检测 NAT 类型" Width="140"
+                                    HorizontalAlignment="Left" Margin="0,12,0,0" Click="BtnDetectNat_Click" />
+                    <TextBlock x:Name="LabNatType" Text="尚未检测；创建或加入房间前会自动检测。"
+                               Margin="0,12,0,0" TextWrapping="Wrap" />
+                    <TextBlock x:Name="LabNatAdvice" Margin="0,8,0,0" TextWrapping="Wrap" Opacity="0.7" />
+                    <TextBlock Text="组网引擎：EasyTier（LGPL-3.0）。依赖从 EasyTier 官方 GitHub Release 下载；Windows 包中的 Npcap/Packet.dll 受单独许可证约束。"
+                               Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,10" Title="联机方式">
+                <StackPanel Margin="25,40,25,18">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                        <local:MyRadioBox x:Name="RadioPunch" Text="P2P 打洞" Checked="True" Check="RadioConnection_Check" />
+                        <local:MyRadioBox x:Name="RadioDirect" Text="手动直连" Margin="28,0,0,0" Check="RadioConnection_Check" />
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <local:MyRadioBox x:Name="RadioHost" Text="我是房主" Checked="True"
                                           Check="RadioMode_Check" />
@@ -26,7 +44,7 @@
                     <!-- 房主：展示自动生成的码 -->
                     <StackPanel x:Name="PanHostCode">
                         <DockPanel>
-                            <local:MyButton DockPanel.Dock="Right" Text="换一个" ColorType="Normal" Width="80"
+                            <local:MyButton x:Name="BtnRegen" DockPanel.Dock="Right" Text="换一个" ColorType="Normal" Width="80"
                                             Click="BtnRegen_Click" />
                             <local:MyButton x:Name="BtnCopyCode" DockPanel.Dock="Right" Text="复制" ColorType="Normal"
                                             Width="72" Margin="8,0,0,0" Click="BtnCopyCode_Click" />
@@ -71,10 +89,10 @@
                     </DockPanel>
 
                     <DockPanel Height="30" Margin="0,0,0,12">
-                        <TextBlock DockPanel.Dock="Left" Text="对端地址" Width="72" Opacity="0.75"
+                        <TextBlock x:Name="LabPeerLabel" DockPanel.Dock="Left" Text="会合节点" Width="72" Opacity="0.75"
                                    VerticalAlignment="Center" />
                         <local:MyTextBox x:Name="TextPeer" Height="28" MaxLines="1" AcceptsReturn="False"
-                                         HintText="对方的 IP:端口，例如 1.2.3.4:11010"
+                                         HintText="双方使用同一 EasyTier 会合节点，例如 tcp://et.starvm.top:11010"
                                          TextChanged="TextPeer_TextChanged" />
                     </DockPanel>
 
@@ -87,6 +105,8 @@
 
                     <TextBlock x:Name="LabPeerHint" Margin="0,0,0,12" TextWrapping="Wrap" Opacity="0.6"
                                FontSize="12" />
+                    <TextBlock x:Name="LabRendezvousHint" Text="会合节点仅帮助双方发现和协商连接，不转发游戏数据。此模式强制 P2P 直连；打洞失败时不会回退中继，请改用左侧「中继联机」。"
+                               Margin="0,0,0,12" TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
 
                     <StackPanel Orientation="Horizontal">
                         <local:MyButton x:Name="BtnStart" Text="创建房间" ColorType="Highlight" Width="120"
@@ -97,6 +117,8 @@
 
                     <TextBlock x:Name="LabStatus" Margin="0,14,0,0" TextWrapping="Wrap" Opacity="0.8"
                                Text="未连接" />
+                    <local:MyLoading x:Name="LoadConnection" Visibility="Collapsed" Margin="0,12,0,0"
+                                     Text="正在验证 P2P 直连…" TextError="组网失败，请查看上方原因" />
 
                     <Border x:Name="PanAddress" Margin="0,12,0,0" Padding="14,12" CornerRadius="6"
                             Background="{DynamicResource ColorBrush7}" Visibility="Collapsed">
@@ -132,6 +154,7 @@
                             <TextBlock x:Name="LabPeerPing" Text="—" Margin="0,5,0,0" FontSize="14" />
                         </StackPanel>
                     </Grid>
+                    <TextBlock x:Name="LabRemoteNat" Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.7" />
 
                 </StackPanel>
             </local:MyCard>

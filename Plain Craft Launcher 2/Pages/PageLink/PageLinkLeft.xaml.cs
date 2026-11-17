@@ -5,7 +5,7 @@ using PCL.Core.App.Localization;
 namespace PCL;
 
 /// <summary>
-///     联机页左侧导航，提供 P2P 直连与中继联机两种方式。
+///     联机页左侧导航，提供 P2P 打洞与中继联机。
 /// </summary>
 public partial class PageLinkLeft : IPageView
 {

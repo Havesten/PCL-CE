@@ -185,6 +185,10 @@ public static partial class Config
         /// </summary>
         [ConfigItem<string>("LinkManualPeer", "")] public partial string ManualPeer { get; set; }
 
+        /// <summary>双方用于发现彼此的 EasyTier 共享节点，不是房主的公网地址。</summary>
+        [ConfigItem<string>("LinkRendezvousPeer", "tcp://et.starvm.top:11010")]
+        public partial string RendezvousPeer { get; set; }
+
         /// <summary>
         /// 纯直连模式下本机的监听端口，双方需要事先约定。
         /// </summary>

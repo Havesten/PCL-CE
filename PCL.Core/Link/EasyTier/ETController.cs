@@ -59,8 +59,9 @@ public static class ETController
     ///     传 null 才走预设节点 + 自定义节点的老路径。
     /// </param>
     /// <param name="listenPort">本机监听端口，&lt;= 0 表示用 EasyTier 的默认值。</param>
+    /// <param name="holePunching">通过共享节点会合并尝试打洞，不继承旧大厅的强制中继设置。</param>
     public static int Launch(bool isHost, string? hostname = null, IReadOnlyList<string>? peers = null,
-        int listenPort = 0)
+        int listenPort = 0, bool holePunching = false)
     {
         try
         {
@@ -75,7 +76,9 @@ public static class ETController
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = $"{ETPath}\\easytier-core.exe", WorkingDirectory = ETPath,
-                    WindowStyle = ProcessWindowStyle.Hidden
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
                 }
             };
 
@@ -102,7 +105,8 @@ public static class ETController
             arguments.Add("network-name", name);
             arguments.Add("network-secret", secret);
             arguments.Add("relay-network-whitelist", name);
-            arguments.Add("private-mode", "true");
+            // 私有模式拒绝不同网络身份的共享节点，会阻断双方在 NAT 后面的会合。
+            if (!holePunching) arguments.Add("private-mode", "true");
             // 网络参数
             if (isHost)
             {
@@ -125,11 +129,11 @@ public static class ETController
             }
 
             // 节点设置
-            if (peers is { Count: > 0 })
+            if (peers is not null)
             {
-                // 纯直连：对方地址由调用方给定，不引入任何预设节点
+                // 指定的直连地址或会合节点，不混入旧大厅的节点列表。
                 foreach (var url in peers) arguments.Add("p", url);
-                LogWrapper.Info("Link", $"纯直连模式，对端: {string.Join(", ", peers)}");
+                LogWrapper.Info("Link", $"{(holePunching ? "打洞会合" : "纯直连")}节点: {string.Join(", ", peers)}");
             }
             else
             {
@@ -166,9 +170,14 @@ public static class ETController
             }
 
             // 中继行为设置
-            if (Config.Link.RelayType == LinkRelayBehavior.ForceRelay)
+            if (peers is null && !holePunching && Config.Link.RelayType == LinkRelayBehavior.ForceRelay)
             {
                 arguments.AddFlag("disable-p2p");
+            }
+            if (holePunching || peers is not null)
+            {
+                // 会合节点只交换连接信息；失败时不允许 EasyTier 回退为数据中继。
+                arguments.AddFlag("p2p-only");
             }
 
             // 数据流代理设置

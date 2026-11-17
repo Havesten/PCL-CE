@@ -1699,7 +1699,8 @@ public partial class FormMain
             // 切换到主页面
             PageChangeExit();
             isChangingPage = true; // 防止下面的勾选直接触发了 PageChangeActual
-            ((MyRadioButton)PanTitleSelect.Children[(int)stack.page]).SetChecked(true, true,
+            PanTitleSelect.Children.OfType<MyRadioButton>()
+                .Single(button => Common.Val(button.Tag) == (int)stack.page).SetChecked(true, true,
                 string.IsNullOrEmpty(PageNameGet(pageCurrent)));
             isChangingPage = false;
             switch (stack.page)
@@ -1893,7 +1894,7 @@ public partial class FormMain
                         PageChangeAnim(Launcher.frmToolsLeft, (FrameworkElement)Launcher.frmToolsLeft.PageGet(subType));
                         break;
                     }
-                case PageType.Link: // 联机（P2P 与中继）
+                case PageType.Link: // 联机（P2P / 中继）
                     {
                         Launcher.frmLinkLeft ??= new PageLinkLeft();
                         subType = Launcher.frmLinkLeft.pageID;

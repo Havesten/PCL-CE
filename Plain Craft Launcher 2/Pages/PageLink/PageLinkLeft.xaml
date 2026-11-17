@@ -14,10 +14,11 @@
                           Type="RadioBox" Tag="0"
                           MinPaddingRight="35" Height="36"
                           VerticalAlignment="Top"
-                          Title="P2P 直连"
+                          Title="P2P 打洞联机"
                           LogoScale="0.85"
                           SvgIcon="lucide/link-2"
                           Check="PageCheck" />
+
         <local:MyListItem x:Name="ItemRelay"
                           IsScaleAnimationEnabled="False"
                           Type="RadioBox" Tag="1"

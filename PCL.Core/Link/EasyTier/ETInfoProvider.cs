@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.Threading;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PCL.Core.App;
@@ -70,7 +71,7 @@ public static class ETInfoProvider
         bool IsContains(string str) => cost.Contains(str, StringComparison.InvariantCultureIgnoreCase);
     }
 
-    private static readonly Process _CliProcess = new() { 
+    private static Process CreateCliProcess() => new() {
         StartInfo = new ProcessStartInfo
         {
             FileName = $"{ETPath}\\easytier-cli.exe",
@@ -129,17 +130,22 @@ public static class ETInfoProvider
     {
         try
         {
-            _CliProcess.StartInfo.Arguments = $"--rpc-portal 127.0.0.1:{ETController.ETRpcPort} -o json peer";
-            _CliProcess.Start();
-            _CliProcess.WaitForExit(180);
-
-            var output = _CliProcess.StandardOutput.ReadToEnd() + _CliProcess.StandardError.ReadToEnd();
-            if (!_CliProcess.HasExited)
+            using var cli = CreateCliProcess();
+            cli.Start();
+            cli.StandardInput.Close();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var stdout = cli.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = cli.StandardError.ReadToEndAsync(timeout.Token);
+            try
             {
-                LogWrapper.Warn("Link", "Cli 获取结果超时(180 ms)，程序状态可能异常！");
-                LogWrapper.Warn("Link", "获取到 EasyTier Cli 信息: \r\n" + output);
+                Task.WhenAll(stdout, stderr, cli.WaitForExitAsync(timeout.Token)).GetAwaiter().GetResult();
             }
-
+            finally
+            {
+                if (!cli.HasExited) cli.Kill(entireProcessTree: true);
+            }
+            if (cli.ExitCode != 0) return new(null, null);
+            var output = stdout.GetAwaiter().GetResult();
             var playerList = new List<ETPlayerInfo>();
             ETPlayerInfo? localInfo = null;
             if (JsonCompat.ParseNode(output) is not JsonArray json)
@@ -152,7 +158,7 @@ public static class ETInfoProvider
                 var hostnameSplit = info.Hostname.Split('|');
                 var playerInfo = new ETPlayerInfo
                 {
-                    IsHost = info.Hostname.StartsWith("H|") || info.Ipv4 == "10.144.144.1",
+                    IsHost = info.Hostname.StartsWith("H|", StringComparison.Ordinal) || info.Ipv4 == "10.144.144.1",
                     Hostname = info.Hostname,
                     Username = hostnameSplit.Length >= 2 ? hostnameSplit[1] : null,
                     McName = hostnameSplit.Length == 3 ? hostnameSplit[2] : null,

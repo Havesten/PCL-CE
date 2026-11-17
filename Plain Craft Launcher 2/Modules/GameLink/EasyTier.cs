@@ -29,8 +29,7 @@ public static partial class GameLink
                     : "x86_64";
                 var addresses = new List<string>
                 {
-                    $"https://staticassets.naids.com/resources/pclce/static/easytier/easytier-windows-{architecture}-v{ETInfoProvider.ETVersion}.zip",
-                    $"https://s3.pysio.online/pcl2-ce/static/easytier/easytier-windows-{architecture}-v{ETInfoProvider.ETVersion}.zip"
+                    $"https://github.com/EasyTier/EasyTier/releases/download/v{ETInfoProvider.ETVersion}/easytier-windows-{architecture}-v{ETInfoProvider.ETVersion}.zip"
                 };
 
                 loaders.Add(

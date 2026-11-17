@@ -165,6 +165,12 @@
                                                  Padding="2,0" Check="BtnTitleSelect_Click"
                                                  LogoScale="0.9"
                                                  SvgIcon="lucide/play" />
+                            <local:MyRadioButton x:Name="BtnTitleSelect4"
+                                                 Text="{loc:Loc Main.Tab.Link}" Tag="4"
+                                                 Margin="5,0" Padding="2,0"
+                                                 Check="BtnTitleSelect_Click"
+                                                 LogoScale="0.95"
+                                                 SvgIcon="lucide/network" />
                             <local:MyRadioButton x:Name="BtnTitleSelect1"
                                                  Text="{loc:Loc Main.Tab.Download}" Tag="1"
                                                  Margin="5,0" Padding="2,0"
@@ -183,12 +189,6 @@
                                                  Check="BtnTitleSelect_Click"
                                                  LogoScale="1"
                                                  SvgIcon="lucide/wrench" />
-                            <local:MyRadioButton x:Name="BtnTitleSelect4"
-                                                 Text="{loc:Loc Main.Tab.Link}" Tag="4"
-                                                 Margin="5,0" Padding="2,0"
-                                                 Check="BtnTitleSelect_Click"
-                                                 LogoScale="0.95"
-                                                 SvgIcon="lucide/network" />
                         </StackPanel>
                     </Grid>
                     <Grid x:Name="PanTitleInner" Visibility="Collapsed" Margin="-16,0,0,0" Opacity="0"
