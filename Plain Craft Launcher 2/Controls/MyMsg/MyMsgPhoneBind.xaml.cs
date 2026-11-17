@@ -30,8 +30,13 @@ public partial class MyMsgPhoneBind
             AppendUniqueNameSuffix(BtnSendCode);
             myDialog = dialog;
             LabTitle.Text = dialog.Title;
-            LabText.Text = dialog.TextContent;
-            LabText.Visibility = string.IsNullOrEmpty(dialog.TextContent) ? Visibility.Collapsed : Visibility.Visible;
+            // 手机号绑定后客户端没有自助解绑入口（只有管理员能在后台解绑），
+            // 必须在用户按下「绑定手机号」之前就说清楚，不能等绑完了再补一句。
+            const string notice = "手机号绑定后不可自行解绑，如需更换号码请联系管理员。";
+            LabText.Text = string.IsNullOrWhiteSpace(dialog.TextContent)
+                ? notice
+                : dialog.TextContent.TrimEnd() + Environment.NewLine + notice;
+            LabText.Visibility = string.IsNullOrEmpty(LabText.Text) ? Visibility.Collapsed : Visibility.Visible;
             ShapeLine.StrokeThickness = Common.GetWpfSize(1d);
 
             var primary = dialog.ButtonText(1);

@@ -645,7 +645,7 @@ public partial class RelayPanel : UserControl
                 var parts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(email)) parts.Add(email);
                 if (me?.User.PhoneBound == true && !string.IsNullOrWhiteSpace(me.User.Phone))
-                    parts.Add("+86 " + me.User.Phone);
+                    parts.Add("+86 " + MaskPhone(me.User.Phone));
                 else if (me?.ForceBindPhone == true)
                     parts.Add("未绑定手机号");
                 if (!string.IsNullOrWhiteSpace(me?.Quota.GroupName)) parts.Add("用户组 " + me!.Quota.GroupName);
@@ -708,6 +708,18 @@ public partial class RelayPanel : UserControl
         if (bytes >= k * k) return $"{bytes / (double)(k * k):0.0} MB";
         if (bytes >= k) return $"{bytes / (double)k:0.0} KB";
         return bytes + " B";
+    }
+
+    /// <summary>
+    ///     手机号脱敏：账号卡上只显示前 3 位与后 4 位。
+    ///     完整号码在客户端没有任何用途，少显示一位就少一分泄露风险。
+    /// </summary>
+    private static string MaskPhone(string phone)
+    {
+        var digits = phone.Trim();
+        if (digits.Length >= 11) return digits[..3] + "****" + digits[^4..];
+        if (digits.Length >= 7) return digits[..2] + "****" + digits[^3..];
+        return "****";
     }
 
     /// <summary>列表项包装：直接绑 RelayAllocation 的话 UsageText 没地方放。</summary>

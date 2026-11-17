@@ -72,6 +72,19 @@ public class MyPageRight : AdornerDecorator
     private FrameworkElement? _panAlways;
     private bool _pageLoaderAutoRun;
 
+    // 页面是否已经离开（PageOnExit / PageOnForceExit 之后为 true，PageOnEnter 时复位）。
+    // 不能用 PageState == Empty 代替：页面刚构造、还没触发 PageOnEnter 时同样是 Empty。
+    // 加载器恰好在这个窗口内完成（版本列表在进入下载页时就已预加载，非常常见）会被
+    // 误判为「页面已离开」，界面从此不再构建，表现为首次打开空白、切走再切回才有内容。
+    private bool _pageLeft;
+
+    // 加载器完成回调（构建界面）是否已经执行过，避免重复构建。
+    private Action<LoaderBase>? _pageLoaderFinishedInvoke;
+    private bool _pageLoaderFinishedInvoked;
+
+    // 完成回调既可能来自后台线程（PreviewFinish），也可能来自 UI 线程（PageOnEnter 补做）。
+    private readonly Lock _pageLoaderFinishLock = new();
+
     // 初始化
     /// <summary>
     ///     表明页面存在需要在后台执行的加载器。
@@ -96,18 +109,19 @@ public class MyPageRight : AdornerDecorator
         _pageLoaderUi = loaderUi;
         _pageLoaderInputInvoke = inputInvoke;
         _pageLoaderAutoRun = autoRun;
+        _pageLoaderFinishedInvoke = finishedInvoke;
+        _pageLoaderFinishedInvoked = false;
         // 添加结束 Invoke
         if (finishedInvoke is not null)
             realLoader.PreviewFinish += _ =>
             {
-                // 页面已经离开（退出动画播完或已被强制清空）时，不再往它的控件上刷 UI。
-                // 原实现在这里用 while + Thread.Sleep 无限等待退出动画结束，但页面一旦离开，
-                // PageState 就会长期停在 PageExit/Empty，这个等待永远结束不了；而该回调可能在
-                // UI 线程上执行，于是整个界面被彻底挂死：窗口还在，点哪里都没反应，只能重启启动器。
-                if (PageState is PageStates.PageExit or PageStates.Empty)
+                // 只有真正离开过的页面才不再往它的控件上刷 UI。原实现用 PageState 判断，
+                // 但页面刚构造（还没 PageOnEnter）同样是 Empty，会导致首次进入时界面永不构建；
+                // 而页面一旦离开，PageState 又会长期停在 PageExit/Empty，用 while + Thread.Sleep
+                // 无限等待退出动画还会把 UI 线程彻底挂死（窗口还在、点哪里都没反应）。
+                if (_pageLeft)
                 {
-                    Common.Log("[UI] 页面已离开，跳过加载完成后的界面刷新（状态：" +
-                               Common.GetStringFromEnum(PageState) + "）", Common.LogLevel.Debug);
+                    Common.Log("[UI] 页面已离开，加载完成后的界面刷新推迟到下次进入", Common.LogLevel.Debug);
                     return;
                 }
 
@@ -118,14 +132,15 @@ public class MyPageRight : AdornerDecorator
                     var deadline = System.Environment.TickCount64 + 800;
                     while (PageState == PageStates.ContentExit && System.Environment.TickCount64 < deadline)
                         Thread.Sleep(10);
-                    if (PageState is PageStates.PageExit or PageStates.Empty)
+                    if (_pageLeft)
                     {
-                        Common.Log("[UI] 等待内容退出动画期间页面已离开，跳过界面刷新", Common.LogLevel.Debug);
+                        Common.Log("[UI] 等待内容退出动画期间页面已离开，界面刷新推迟到下次进入", Common.LogLevel.Debug);
                         return;
                     }
                 }
 
-                Common.RunInUiWait(() => finishedInvoke(realLoader));
+                // PreviewFinish 在 State 置为 Finished 之前触发，这里已知本次加载即将成功完成。
+                InvokeLoaderFinished(true);
                 Thread.Sleep(20); // 由于大量初始化控件会导致掉帧，延迟触发 State 改变事件
             };
         realLoader.OnStateChangedUi += (loader, newState, oldState) =>
@@ -151,13 +166,47 @@ public class MyPageRight : AdornerDecorator
         }
 
         if (_pageLoader.State == Common.LoadState.Finished && finishedInvoke is not null)
-            Common.RunInUiWait(() => finishedInvoke(realLoader)); // 加载器已提前完成，直接触发事件
+            InvokeLoaderFinished(false); // 加载器已提前完成，直接触发事件
         // 设置加载环
         _pageLoaderUi.State = realLoader;
         _pageLoaderUi.Click += (_, _) =>
         {
             if (realLoader.State == Common.LoadState.Failed) PageLoaderRestart();
         }; // 点击重试事件
+    }
+
+    /// <summary>
+    ///     执行加载器完成后的界面构建，保证同一次加载只构建一次。
+    ///     <paramref name="knownFinished" /> 为 true 表示调用方已确认本次加载成功
+    ///     （PreviewFinish 触发时 <see cref="LoaderBase.State" /> 尚未置为 Finished）。
+    /// </summary>
+    private void InvokeLoaderFinished(bool knownFinished)
+    {
+        if (_pageLoader is null || _pageLoaderFinishedInvoke is null)
+            return;
+        // 锁只保护标志位：构建过程要回到 UI 线程执行，持有锁去等待 UI 线程会和
+        // 恰好正在 PageOnEnter 里补做构建的 UI 线程互相等待，形成死锁。
+        lock (_pageLoaderFinishLock)
+        {
+            if (_pageLoaderFinishedInvoked)
+                return;
+            if (!knownFinished && _pageLoader.State != Common.LoadState.Finished)
+                return;
+            _pageLoaderFinishedInvoked = true;
+        }
+
+        try
+        {
+            Common.RunInUiWait(() => _pageLoaderFinishedInvoke(_pageLoader));
+        }
+        catch (Exception ex)
+        {
+            // 构建失败要允许重试（例如切走再切回时重新拉一次），否则页面会一直空白。
+            lock (_pageLoaderFinishLock)
+                _pageLoaderFinishedInvoked = false;
+            Common.Log(ex, "构建页面内容失败", Common.LogLevel.Hint,
+                userSummary: Lang.Text("Application.Loader.Error.OperationFailed"));
+        }
     }
 
     private void RefreshLocalizationIfStale()
@@ -185,6 +234,9 @@ public class MyPageRight : AdornerDecorator
     {
         if (!_pageLoaderAutoRun)
             return;
+        // 重新加载后，下一次完成时要允许重新构建界面。
+        lock (_pageLoaderFinishLock)
+            _pageLoaderFinishedInvoked = false;
         if (_pageLoader is LoaderTask task)
         {
             _pageLoader.Start(task.StartGetInputNoType(input, _pageLoaderInputInvoke),
@@ -211,7 +263,11 @@ public class MyPageRight : AdornerDecorator
     {
         if (Common.modeDebug)
             Common.Log("[UI] 已触发 PageOnEnter");
+        _pageLeft = false;
         RefreshLocalizationIfStale();
+        // 加载器在页面离开期间完成，或在本页构造完成之前就已经加载完时，在这里补做界面构建。
+        // 没有这一步，页面会停在空的 PanContent 上，用户看到的就是「首次打开读取不出来」。
+        InvokeLoaderFinished(false);
         PageEnter?.Invoke();
         switch (PageState)
         {
@@ -288,6 +344,7 @@ public class MyPageRight : AdornerDecorator
     {
         if (Common.modeDebug)
             Common.Log("[UI] 已触发 PageOnExit");
+        _pageLeft = true;
         PageExit?.Invoke();
         switch (PageState)
         {
@@ -338,6 +395,7 @@ public class MyPageRight : AdornerDecorator
     /// </summary>
     public void PageOnForceExit()
     {
+        _pageLeft = true;
         if (PageState == PageStates.Empty)
             return;
         if (Common.modeDebug)
@@ -544,6 +602,9 @@ public class MyPageRight : AdornerDecorator
                     return;
                 if (Common.modeDebug)
                     Common.Log("[UI] 已触发 PageLoaderState (Start/Refresh)");
+                // （重新）开始运行，本次加载的界面构建资格要重新发放
+                lock (_pageLoaderFinishLock)
+                    _pageLoaderFinishedInvoked = false;
                 // （重新）开始运行
                 // 需要从部分状态切换到 ReloadExit
                 switch (PageState)

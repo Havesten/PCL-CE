@@ -44,7 +44,9 @@ public partial class PageDownloadClient
                 _ => new List<JsonObject>()
             );
 
-            var versions = (JsonArray)GameDownload.dlClientListLoader.output.Value["versions"];
+            var versions = GameDownload.dlClientListLoader.output.Value?["versions"] as JsonArray;
+            if (versions is null || versions.Count == 0)
+                throw new Exception("版本列表返回为空");
             foreach (JsonObject Version in versions)
             {
                 var cat = McVersionClassifier.ClassifyVersion(Version);
@@ -67,27 +69,28 @@ public partial class PageDownloadClient
                 "Title",
                 () => Lang.Text("Download.Version.Latest.Title"));
             var topestVersions = new List<JsonObject>();
-            var release = (JsonObject)dict[McVersionCategory.Release][0].DeepClone();
-            release["lore"] = "Download.Version.Latest.Release";
-            release["loreArgs"] = new JsonArray(
-                McVersionClassifier.GetReleaseTime(release).ToString("O"));
-            release["loreArgsType"] = "date";
-            topestVersions.Add(release);
-            if (McVersionClassifier.GetReleaseTime(dict[McVersionCategory.Release][0]) < McVersionClassifier.GetReleaseTime(dict[McVersionCategory.Snapshot][0]))
+            var releases = dict[McVersionCategory.Release];
+            var snapshots = dict[McVersionCategory.Snapshot];
+            if (releases.Count > 0)
             {
-                var snapshot = (JsonObject)dict[McVersionCategory.Snapshot][0].DeepClone();
-                snapshot["lore"] = "Download.Version.Latest.Development";
-                snapshot["loreArgs"] = new JsonArray(
-                    McVersionClassifier.GetReleaseTime(snapshot).ToString("O"));
-                snapshot["loreArgsType"] = "date";
-                topestVersions.Add(snapshot);
+                var release = (JsonObject)releases[0].DeepClone();
+                release["lore"] = "Download.Version.Latest.Release";
+                release["loreArgs"] = new JsonArray(
+                    McVersionClassifier.GetReleaseTime(release).ToString("O"));
+                release["loreArgsType"] = "date";
+                topestVersions.Add(release);
+                if (snapshots.Count > 0 &&
+                    McVersionClassifier.GetReleaseTime(releases[0]) <
+                    McVersionClassifier.GetReleaseTime(snapshots[0]))
+                {
+                    var snapshot = (JsonObject)snapshots[0].DeepClone();
+                    snapshot["lore"] = "Download.Version.Latest.Development";
+                    snapshot["loreArgs"] = new JsonArray(
+                        McVersionClassifier.GetReleaseTime(snapshot).ToString("O"));
+                    snapshot["loreArgsType"] = "date";
+                    topestVersions.Add(snapshot);
+                }
             }
-
-            var panInfo = new StackPanel
-            {
-                Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d), VerticalAlignment = VerticalAlignment.Top,
-                RenderTransform = new TranslateTransform(0d, 0d), Tag = topestVersions
-            };
 
             void PutMethod(StackPanel stack)
             {
@@ -96,10 +99,19 @@ public partial class PageDownloadClient
                         DownloadUi.McDownloadMenuSave, true));
             }
 
-            ;
-            MyCard.StackInstall(ref panInfo, PutMethod);
-            cardInfo.Children.Add(panInfo);
-            PanMain.Children.Add(cardInfo);
+            if (topestVersions.Count > 0)
+            {
+                var panInfo = new StackPanel
+                {
+                    Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    RenderTransform = new TranslateTransform(0d, 0d), Tag = topestVersions
+                };
+
+                MyCard.StackInstall(ref panInfo, PutMethod);
+                cardInfo.Children.Add(panInfo);
+                PanMain.Children.Add(cardInfo);
+            }
 
             foreach (var Pair in dict)
             {
@@ -125,6 +137,10 @@ public partial class PageDownloadClient
                 newCard.IsSwapped = true;
                 PanMain.Children.Add(newCard);
             }
+
+            // 一张卡都没建出来说明分类结果异常，宁可报错让用户点重试，也不要留个空白页
+            if (PanMain.Children.Count == 0)
+                throw new Exception("版本列表里没有任何可用的版本");
         }
         catch (Exception ex)
         {
