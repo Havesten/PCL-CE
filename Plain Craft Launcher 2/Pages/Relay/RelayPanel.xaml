@@ -190,5 +190,8 @@
                 </ListBox>
             </StackPanel>
         </local:MyCard>
+        <TextBlock Text="中继联机服务说明" FontWeight="SemiBold" Opacity="0.65" Margin="5,8,5,0" />
+        <TextBlock Text="本中继联机服务由独立服务提供方运营，与 PCLCE 官方及龙腾猫跃无关。服务可用性、账号与使用限制由服务提供方负责；联机问题请联系本服务维护者。"
+                   TextWrapping="Wrap" Opacity="0.55" FontSize="12" Margin="5,8,5,15" />
     </StackPanel>
 </UserControl>

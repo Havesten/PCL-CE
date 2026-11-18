@@ -27,3 +27,13 @@ public sealed record P2pCloudRoom(
 
 internal sealed record P2pNodeList([property: JsonPropertyName("nodes")] IReadOnlyList<P2pRendezvousNode>? Nodes);
 internal sealed record P2pRoomResult([property: JsonPropertyName("room")] P2pCloudRoom Room);
+
+public sealed record P2pRoomStatus(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("generation")] string Generation,
+    [property: JsonPropertyName("ready")] bool Ready,
+    [property: JsonPropertyName("state")] string State,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt,
+    [property: JsonPropertyName("node_available")] bool NodeAvailable);
+
+internal sealed record P2pRoomStatusResult([property: JsonPropertyName("status")] P2pRoomStatus Status);

@@ -181,6 +181,24 @@ public sealed class RelayApi
     public async Task ReleaseP2pRoomAsync(string id, CancellationToken ct = default) =>
         _ = await SendAsync<RelayRoomReadyResult>(HttpMethod.Post, "/api/v1/p2p/rooms/release", new { id }, ct).ConfigureAwait(false);
 
+    public async Task<P2pRoomStatus> GetP2pRoomStatusAsync(string id, string? phase = null, string? failureCode = null,
+        int retryCount = 0, CancellationToken ct = default)
+    {
+        P2pRoomStatus? status;
+        try
+        {
+            status = (await SendAsync<P2pRoomStatusResult>(HttpMethod.Post, "/api/v1/p2p/rooms/status",
+                new { id, phase, failure_code = failureCode ?? "none", retry_count = Math.Clamp(retryCount, 0, 99) }, ct).ConfigureAwait(false)).Status;
+        }
+        catch (RelayApiException ex) when (ex.Status == HttpStatusCode.NotFound &&
+            ex.Body?.Contains("room_not_found", StringComparison.Ordinal) != true)
+        { throw new RelayApiException(ex.Status, "云端尚未支持房间状态查询，请联系管理员更新云端"); }
+        if (status is null || string.IsNullOrWhiteSpace(status.Id) || string.IsNullOrWhiteSpace(status.Generation) ||
+            status.ExpiresAt == default || status.State is not ("active" or "unready"))
+            throw new InvalidOperationException("云端房间状态暂时无效，请稍后重试");
+        return status;
+    }
+
     // ---------------------------------------------------------------- 传输层
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
@@ -294,6 +312,7 @@ public sealed class RelayApi
         "relay_disabled" => "中继联机已由管理员关闭",
         "p2p_node_unavailable" => "会合节点暂不可用，请选择其他节点",
         "p2p_room_exists" => "已有 P2P 房间，请先关闭后再创建",
+        "room_full" => "房间成员数已达上限，请联系房主",
         "version_too_low" => "版本过低，需要更新",
         // 服务端按来源 IP 判定不在中国大陆时返回；文案由服务端下发，这里只是兜底
         "region_blocked" => "当前可能位于非中国大陆地区，暂时无法使用此功能",

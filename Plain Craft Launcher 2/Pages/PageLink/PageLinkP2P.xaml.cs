@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,6 +18,8 @@ using PCL.Core.Link.Lobby;
 using PCL.Core.Link.Relay;
 using PCL.Core.Link.Scaffolding.EasyTier;
 using PCL.Core.UI.Dialogs;
+using PCL.Core.Logging;
+using Microsoft.Win32;
 
 namespace PCL;
 
@@ -42,6 +45,10 @@ public partial class PageLinkP2P : IPageView
     private Task? _shutdown;
     private CancellationTokenSource? _attempt;
     private Action<string>? _leaseClosed;
+    private Action<string?>? _leaseChanged;
+    private int _networkChanged;
+    private int _transportReady;
+    private string _networkSignature = "";
     private readonly object _launchState = new();
     private long _generation;
     private bool _starting;
@@ -52,6 +59,7 @@ public partial class PageLinkP2P : IPageView
     private volatile bool _exiting;
     private bool _suppress;
     private bool _pathFailed;
+    private bool _cancelledByUser;
     private readonly CancellationTokenSource _operations = new();
     private bool IsHost => RadioHost.Checked;
 
@@ -65,6 +73,9 @@ public partial class PageLinkP2P : IPageView
         Loaded += async (_, _) => { UpdateMode(); await RefreshConfigAsync(); };
         Application.Current.Exit += (_, _) => OnExit();
         Lifecycle.When(LifecycleState.Exiting, OnExit);
+        NetworkChange.NetworkAddressChanged += NetworkAddressChanged;
+        NetworkChange.NetworkAvailabilityChanged += NetworkAvailabilityChanged;
+        SystemEvents.PowerModeChanged += PowerModeChanged;
     }
     public async void OnNavigatedTo(object? parameter) { await RefreshConfigAsync(); }
     public void OnNavigatedFrom() { }
@@ -223,7 +234,7 @@ public partial class PageLinkP2P : IPageView
             GetCaptchaAsync = async () => { var cap = await _api.GetCaptchaAsync(ct); return (cap.Id, cap.Prompt); },
             SendSmsAsync = (phone, id, answer) => _api.SendSmsCodeAsync(phone, id, answer, ct),
             BindAsync = (phone, code) => _api.BindPhoneAsync(phone, code, ct)
-        });
+        }).WaitAsync(ct);
         ct.ThrowIfCancellationRequested();
         return !(await _api.GetMeAsync(ct)).PhoneRequired;
     }
@@ -261,7 +272,9 @@ public partial class PageLinkP2P : IPageView
     {
         if (_working || _connected || _detecting || _pathFailed || _stopping || _exiting) return;
         _working = true; _starting = true;
+        _cancelledByUser = false;
         _attempt = CancellationTokenSource.CreateLinkedTokenSource(_operations.Token);
+        _attempt.CancelAfter(TimeSpan.FromSeconds(120));
         var generation = Interlocked.Increment(ref _generation);
         UpdateButtons();
         _startup = StartCoreAsync(IsHost, generation, _attempt.Token);
@@ -320,31 +333,26 @@ public partial class PageLinkP2P : IPageView
                 allocated = await _api.CreateP2pRoomAsync(node.Id, game.Name, game.Version, _bridgePort, ct);
                 _room = allocated;
             }
-            else _room = await _api.JoinP2pRoomAsync(TextJoinCode.Text, ct);
+            else
+            {
+                LabStatus.Text = "正在寻找房主…";
+                _room = await _api.JoinP2pRoomAsync(TextJoinCode.Text, ct);
+            }
             ValidateRoom(_room);
             ct.ThrowIfCancellationRequested();
             var peer = _room.RendezvousUri;
-            if (Config.Link.IpMode == LinkIpMode.Ipv6Only)
-            {
-                var uri = new Uri(peer);
-                var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, ct);
-                var address = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6);
-                if (address is null) throw new InvalidOperationException("会合节点未提供 IPv6，请改用自动");
-                peer = $"{uri.Scheme}://[{address}]:{uri.Port}";
-            }
+            peer = await ResolvePeerAsync(peer, Config.Link.IpMode, ct);
             lock (_launchState)
             {
                 ct.ThrowIfCancellationRequested();
-                LobbyInfoProvider.TargetLobby = new LobbyInfoProvider.LobbyInfo
-                {
-                    OriginalCode = _room.Code, Type = LobbyInfoProvider.LobbyType.PCLCE,
-                    NetworkName = _room.NetworkName, NetworkSecret = _room.NetworkSecret, Port = _room.GamePort, Ip = "10.114.51.41"
-                };
+                LabStatus.Text = hosting ? "正在创建房间…" : "正在建立 P2P 直连…";
+                ConfigureLobby(_room);
                 if (ETController.Launch(hosting, peers: [peer], listenPort: 0, holePunching: true) != 0)
                     throw new InvalidOperationException("联机组件启动失败");
                 _process = ETController.ETProcess ?? throw new InvalidOperationException("联机组件启动失败");
                 _connection = CancellationTokenSource.CreateLinkedTokenSource(_operations.Token);
                 _connected = true;
+                Interlocked.Exchange(ref _transportReady, 1);
             }
             var process = _process;
             var hostGame = game;
@@ -352,9 +360,9 @@ public partial class PageLinkP2P : IPageView
             lock (_launchState)
             {
                 ct.ThrowIfCancellationRequested();
-                lease = new P2pRoomLease(_api, _room, hosting, async token =>
-                    ReferenceEquals(process, ETController.ETProcess) && !process.HasExited && hostGame is not null &&
-                    await MinecraftServerProbe.ProbeAsync(hostGame.Endpoint, TimeSpan.FromSeconds(3), token) is not null);
+                lease = new P2pRoomLease(_api, _room, hosting, async token => hostGame is not null &&
+                    await MinecraftServerProbe.ProbeAsync(hostGame.Endpoint, TimeSpan.FromSeconds(3), token) is not null,
+                    () => _process is { } transport && IsProcessHealthy(transport) && Volatile.Read(ref _transportReady) != 0);
                 _lease = lease; ownedByLease = true;
                 _leaseClosed = message => Dispatcher.BeginInvoke(new Action(async () =>
                 {
@@ -362,6 +370,16 @@ public partial class PageLinkP2P : IPageView
                         await StopAsync(message);
                 }));
                 lease.Closed += _leaseClosed;
+                _leaseChanged = message => Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (generation == Interlocked.Read(ref _generation) && ReferenceEquals(_lease, lease) && !_exiting)
+                    {
+                        LabCloudStatus.Text = message ?? "";
+                        LabCloudStatus.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
+                    }
+                }));
+                lease.Changed += _leaseChanged;
+                lease.Report(hosting ? "hosting" : "waiting_host");
             }
             await lease.StartAsync(ct);
             lock (_launchState)
@@ -379,9 +397,15 @@ public partial class PageLinkP2P : IPageView
             var monitorToken = _connection.Token;
             var lan = _lan;
             var entrance = _guestEntrance?.LocalEndpoint;
-            _monitor = Task.Run(() => MonitorAsync(process, hosting, lan, entrance, generation, monitorToken));
+            var room = _room;
+            var localForwardPort = LobbyInfoProvider.JoinerLocalPort;
+            _networkSignature = ReadNetworkSignature();
+            Interlocked.Exchange(ref _networkChanged, 0);
+            _monitor = Task.Run(() => MonitorAsync(process, room, peer, localForwardPort, lease,
+                hosting, lan, entrance, generation, monitorToken));
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { await StopAsync("已取消连接"); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        { await StopAsync(_exiting || _attempt?.IsCancellationRequested == true && _cancelledByUser ? "已取消连接" : "连接准备超时，请检查网络后重试"); }
         catch (Exception ex)
         {
             await StopAsync(ex.Message);
@@ -409,38 +433,141 @@ public partial class PageLinkP2P : IPageView
             throw new InvalidDataException("云端返回的房间信息无效");
     }
 
-    private async Task MonitorAsync(Process process, bool hosting, P2pLanPublisher? lan,
-        IPEndPoint? entrance, long generation, CancellationToken ct)
+    private static bool IsProcessHealthy(Process process)
+    {
+        try { return ReferenceEquals(process, ETController.ETProcess) && !process.HasExited; }
+        catch (InvalidOperationException) { return false; }
+    }
+    private static void ConfigureLobby(P2pCloudRoom room) => LobbyInfoProvider.TargetLobby = new LobbyInfoProvider.LobbyInfo
+    {
+        OriginalCode = room.Code, Type = LobbyInfoProvider.LobbyType.PCLCE,
+        NetworkName = room.NetworkName, NetworkSecret = room.NetworkSecret, Port = room.GamePort, Ip = "10.114.51.41"
+    };
+    private static async Task<string> ResolvePeerAsync(string peer, LinkIpMode mode, CancellationToken ct)
+    {
+        if (mode != LinkIpMode.Ipv6Only) return peer;
+        var uri = new Uri(peer);
+        var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, ct);
+        var address = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6);
+        if (address is null) throw new InvalidOperationException("会合节点未提供 IPv6，请改用自动");
+        return $"{uri.Scheme}://[{address}]:{uri.Port}";
+    }
+    private static string ReadNetworkSignature()
+    {
+        try
+        {
+            return string.Join("|", NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType is not
+                    (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
+                .Select(n => (n.Id, Properties: n.GetIPProperties()))
+                .Where(n => n.Properties.GatewayAddresses.Any(g => !g.Address.Equals(IPAddress.Any) && !g.Address.Equals(IPAddress.IPv6Any)))
+                .Select(n => n.Id + ":" + string.Join(",", n.Properties.UnicastAddresses
+                    .Select(a => a.Address.ToString()).OrderBy(a => a)))
+                .OrderBy(n => n));
+        }
+        catch (NetworkInformationException) { return ""; }
+    }
+    private void CheckNetworkChange()
+    {
+        var signature = ReadNetworkSignature();
+        var previous = Interlocked.Exchange(ref _networkSignature, signature);
+        if (previous != signature)
+        { Interlocked.Exchange(ref _networkChanged, 1); Interlocked.Exchange(ref _transportReady, 0); }
+    }
+    private static string PhaseCode(P2pConnectionPhase phase) => phase switch
+    {
+        P2pConnectionPhase.WaitingHost => "waiting_host", P2pConnectionPhase.Connecting => "connecting",
+        P2pConnectionPhase.Validating => "validating", P2pConnectionPhase.Connected => "connected",
+        P2pConnectionPhase.Hosting => "hosting", P2pConnectionPhase.Reconnecting => "reconnecting", _ => "failed"
+    };
+    private void NetworkAddressChanged(object? sender, EventArgs e) => CheckNetworkChange();
+    private void NetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e) => CheckNetworkChange();
+    private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Resume)
+        { Interlocked.Exchange(ref _networkChanged, 1); Interlocked.Exchange(ref _transportReady, 0); }
+    }
+
+    private async Task MonitorAsync(Process process, P2pCloudRoom room, string peer, int localForwardPort, P2pRoomLease lease,
+        bool hosting, P2pLanPublisher? lan, IPEndPoint? entrance, long generation, CancellationToken ct)
     {
         string? ended = null;
-        DateTime? peerSeenAt = null;
         var pathFailed = false;
+        var recovery = new P2pConnectionRecovery(hosting);
+        var elapsed = Stopwatch.StartNew();
+        P2pRecoveryDecision? previous = null;
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
             while (await timer.WaitForNextTickAsync(ct))
             {
-                if (!ReferenceEquals(process, ETController.ETProcess) || process.HasExited)
-                { ended = "连接已结束"; break; }
-                var result = await Task.Run(ETInfoProvider.GetPlayerList, ct);
+                var componentHealthy = IsProcessHealthy(process);
+                List<ETPlayerInfo>? peers = null;
+                if (componentHealthy)
+                {
+                    try { peers = (await Task.Run(ETInfoProvider.GetPlayerList, ct)).Item1; }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception) { }
+                }
                 if (ct.IsCancellationRequested) break;
-                if (result.Item1 is not { } peers) continue;
-                var others = P2pReadiness.RoomPeers(peers);
-                var hostReady = hosting ? others.Any(p => p.Cost == ETConnectionType.P2P) : P2pReadiness.CanJoinHost(peers);
-                if (others.Count > 0 && !hostReady)
+                var others = P2pReadiness.RoomPeers(peers ?? []);
+                var direct = hosting ? others.Any(p => p.Cost == ETConnectionType.P2P) : P2pReadiness.CanJoinHost(peers ?? []);
+                var gameReady = hosting || direct && entrance is not null &&
+                    await MinecraftServerProbe.ProbeAsync(entrance, TimeSpan.FromSeconds(3), ct) is not null;
+                var networkChanged = Interlocked.Exchange(ref _networkChanged, 0) != 0;
+                var networkAvailable = NetworkInterface.GetIsNetworkAvailable();
+                var decision = recovery.Observe(elapsed.Elapsed, componentHealthy && peers is not null && networkAvailable,
+                    others.Count > 0, direct, gameReady, networkChanged, networkAvailable);
+                var phase = PhaseCode(decision.Phase);
+                Interlocked.Exchange(ref _transportReady, networkAvailable && decision.Phase is
+                    (P2pConnectionPhase.Hosting or P2pConnectionPhase.Connected) ? 1 : 0);
+                var failure = decision.FailureCode ?? (decision.Phase == P2pConnectionPhase.Reconnecting ?
+                    componentHealthy ? "connection_lost" : "process_exited" : null);
+                lease.Report(phase, failure, decision.RetryCount);
+                if (previous?.Phase != decision.Phase || previous?.RetryCount != decision.RetryCount)
                 {
-                    peerSeenAt ??= DateTime.UtcNow;
-                    if (DateTime.UtcNow - peerSeenAt > TimeSpan.FromSeconds(45))
-                    { pathFailed = true; ended = "本次房间无法建立 P2P 连接，请重新检测或使用中继联机"; break; }
+                    LogWrapper.Info("Link", $"P2P 状态={phase}, 诊断={failure ?? "none"}, 重试={decision.RetryCount}");
+                    previous = decision;
                 }
-                else peerSeenAt = null;
-                if (lan is not null)
+                if (lan is not null) lan.Enabled = decision.Phase == P2pConnectionPhase.Connected;
+                if (decision.Phase == P2pConnectionPhase.Failed)
                 {
-                    lan.Enabled = hostReady && await MinecraftServerProbe.ProbeAsync(
-                        entrance!, TimeSpan.FromSeconds(3), ct) is not null;
+                    pathFailed = decision.FailureCode == "connect_timeout";
+                    ended = decision.FailureCode == "game_unavailable" ? "游戏验证超时，请确认房主已开启局域网联机" :
+                        "P2P 连接或恢复超时，请重新检测网络后重试";
+                    using var reportBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    reportBudget.CancelAfter(TimeSpan.FromSeconds(3));
+                    try { await _api.GetP2pRoomStatusAsync(room.Id, phase, failure, decision.RetryCount, reportBudget.Token); } catch (Exception) { }
+                    break;
                 }
-                var text = hosting ? (hostReady ? "玩家已连接" : "房间运行中，等待玩家加入") :
-                    lan?.Enabled == true ? "已连接，请在游戏的多人游戏列表进入" : "正在连接房主…";
+                if (decision.Restart)
+                {
+                    try { peer = await ResolvePeerAsync(room.RendezvousUri, Config.Link.IpMode, ct); }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception) { continue; }
+                    lock (_launchState)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        if (generation != Interlocked.Read(ref _generation)) break;
+                        if (ReferenceEquals(process, ETController.ETProcess)) ETController.Exit();
+                        if (ETController.Status != ETState.Stopped) { ended = "其他联机连接正在运行，请先断开"; break; }
+                        ConfigureLobby(room);
+                        if (ETController.Launch(hosting, peers: [peer], listenPort: 0, holePunching: true, localForwardPort: localForwardPort) == 0)
+                        {
+                            process = ETController.ETProcess!;
+                            _process = process;
+                        }
+                    }
+                }
+                var text = decision.Phase switch
+                {
+                    P2pConnectionPhase.Hosting => direct ? "玩家已连接" : "房间运行中，等待玩家加入",
+                    P2pConnectionPhase.Connected => "已连接，请在游戏的多人游戏列表进入",
+                    P2pConnectionPhase.WaitingHost => "正在寻找房主…",
+                    P2pConnectionPhase.Connecting => "正在建立 P2P 直连…",
+                    P2pConnectionPhase.Validating => "正在验证游戏…",
+                    _ => "连接中断，正在自动恢复；恢复后请重新进入游戏。"
+                };
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (generation == Interlocked.Read(ref _generation) && _connected && !_stopping && !_working && !_exiting)
@@ -463,7 +590,7 @@ public partial class PageLinkP2P : IPageView
     {
         if (_starting)
         {
-            _attempt?.Cancel();
+            _cancelledByUser = true; _attempt?.Cancel();
             BtnStop.IsEnabled = false; LabStatus.Text = "正在取消连接…";
             if (_startup is { } startup) await startup;
             return;
@@ -479,20 +606,26 @@ public partial class PageLinkP2P : IPageView
     private async Task StopCoreAsync(string message)
     {
         _stopping = true; UpdateButtons();
-        Interlocked.Increment(ref _generation);
-        _attempt?.Cancel();
-        _connection?.Cancel();
-        _lan?.Dispose(); _lan = null;
-        if (_process is not null && ReferenceEquals(_process, ETController.ETProcess)) ETController.Exit();
-        _process = null;
+        lock (_launchState)
+        {
+            Interlocked.Increment(ref _generation);
+            _attempt?.Cancel();
+            _connection?.Cancel();
+            Interlocked.Exchange(ref _transportReady, 0);
+            _lan?.Dispose(); _lan = null;
+            if (_process is not null && ReferenceEquals(_process, ETController.ETProcess)) ETController.Exit();
+            _process = null;
+        }
         if (_monitor is not null) try { await _monitor; } catch (Exception) { }
         _monitor = null;
         if (_lease is not null)
         {
             if (_leaseClosed is not null) _lease.Closed -= _leaseClosed;
+            if (_leaseChanged is not null) _lease.Changed -= _leaseChanged;
             await _lease.DisposeAsync();
         }
         _leaseClosed = null;
+        _leaseChanged = null;
         _lease = null; _room = null;
         if (_hostBridge is not null) await _hostBridge.DisposeAsync(); _hostBridge = null;
         if (_guestEntrance is not null) await _guestEntrance.DisposeAsync(); _guestEntrance = null;
@@ -501,6 +634,7 @@ public partial class PageLinkP2P : IPageView
         _connected = false;
         _games = []; ComboGames.ItemsSource = _games; ComboGames.Visibility = Visibility.Collapsed;
         PanCode.Visibility = Visibility.Collapsed;
+        LabCloudStatus.Visibility = Visibility.Collapsed;
         LabStatus.Text = message;
         _stopping = false; UpdateButtons();
     }
@@ -517,6 +651,9 @@ public partial class PageLinkP2P : IPageView
         {
             if (_exiting) return;
             _exiting = true; Interlocked.Increment(ref _generation);
+            NetworkChange.NetworkAddressChanged -= NetworkAddressChanged;
+            NetworkChange.NetworkAvailabilityChanged -= NetworkAvailabilityChanged;
+            SystemEvents.PowerModeChanged -= PowerModeChanged;
             _operations.Cancel(); _connection?.Cancel(); _lan?.Dispose();
             if (_hostBridge is not null) _ = _hostBridge.DisposeAsync();
             if (_guestEntrance is not null) _ = _guestEntrance.DisposeAsync();

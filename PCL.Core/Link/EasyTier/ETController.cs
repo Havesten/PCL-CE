@@ -61,7 +61,7 @@ public static class ETController
     /// <param name="listenPort">本机监听端口，&lt;= 0 表示用 EasyTier 的默认值。</param>
     /// <param name="holePunching">通过共享节点会合并尝试打洞，不继承旧大厅的强制中继设置。</param>
     public static int Launch(bool isHost, string? hostname = null, IReadOnlyList<string>? peers = null,
-        int listenPort = 0, bool holePunching = false)
+        int listenPort = 0, bool holePunching = false, int localForwardPort = 0)
     {
         try
         {
@@ -122,7 +122,7 @@ public static class ETController
                 arguments.Add("tcp-whitelist", "0");
                 arguments.Add("udp-whitelist", "0");
 
-                JoinerLocalPort = NetworkHelper.NewTcpPort();
+                JoinerLocalPort = localForwardPort is > 0 and <= 65535 ? localForwardPort : NetworkHelper.NewTcpPort();
                 LogWrapper.Info("Link", $"ET 端口转发: 远程 {TargetLobby.Port} -> 本地 {JoinerLocalPort}");
                 arguments.Add("port-forward", $"tcp://127.0.0.1:{JoinerLocalPort}/{TargetLobby.Ip}:{TargetLobby.Port}");
                 arguments.Add("port-forward", $"udp://127.0.0.1:{JoinerLocalPort}/{TargetLobby.Ip}:{TargetLobby.Port}");

@@ -59,6 +59,7 @@
                         <local:MyButton x:Name="BtnStop" Text="关闭房间" ColorType="Red" Width="100" Margin="10,0,0,0" Visibility="Collapsed" Click="BtnStop_Click" />
                     </StackPanel>
                     <TextBlock x:Name="LabStatus" Text="未连接" Margin="0,14,0,0" TextWrapping="Wrap" Opacity="0.8" />
+                    <TextBlock x:Name="LabCloudStatus" Margin="0,8,0,0" TextWrapping="Wrap" Opacity="0.65" Visibility="Collapsed" />
                 </StackPanel>
             </local:MyCard>
             <local:MyCard Title="高级设置" CanSwap="True" IsSwapped="True" Margin="0,0,0,10">
@@ -72,6 +73,11 @@
                     <TextBlock Text="默认使用自动。更改后在下次连接时生效。" Opacity="0.7" TextWrapping="Wrap" Margin="0,12,0,0" />
                 </StackPanel>
             </local:MyCard>
+            <TextBlock Text="P2P 联机说明" FontWeight="SemiBold" Opacity="0.65" Margin="5,8,5,0" />
+            <TextBlock Text="本启动器内置的 P2P 联机基于 EasyTier，游戏数据由玩家直接传输。连接效果取决于双方网络环境，请保持启动器运行，并使用一致的游戏版本与模组。"
+                       TextWrapping="Wrap" Opacity="0.55" FontSize="12" Margin="5,8,5,0" />
+            <TextBlock Text="本功能由本启动器维护者提供，与 PCLCE 官方及龙腾猫跃无关。联机问题请联系本启动器维护者。"
+                       TextWrapping="Wrap" Opacity="0.55" FontSize="12" Margin="5,6,5,15" />
         </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>
