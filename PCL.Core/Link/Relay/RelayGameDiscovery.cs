@@ -14,13 +14,17 @@ namespace PCL.Core.Link.Relay;
 /// <summary>只检查本机已有监听端口，并验证本机 Minecraft 局域网广播。</summary>
 public static class RelayGameDiscovery
 {
+    private static readonly ConcurrentDictionary<int, byte> InternalPorts = new();
+    public static void RegisterInternalPort(int port) => InternalPorts.TryAdd(port, 0);
+    public static void UnregisterInternalPort(int port) => InternalPorts.TryRemove(port, out _);
+    private static bool IsInternalPort(int port) => InternalPorts.ContainsKey(port) || RelayRoomClient.IsLocalRoomPort(port);
     public static async Task<IReadOnlyList<RelayGameServer>> ScanAsync(CancellationToken ct = default)
     {
         IEnumerable<IPEndPoint> candidates;
         try
         {
             candidates = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
-                .Where(endpoint => endpoint.Port > 0 && !RelayRoomClient.IsLocalRoomPort(endpoint.Port))
+                .Where(endpoint => endpoint.Port > 0 && !IsInternalPort(endpoint.Port))
                 .Select(endpoint => new IPEndPoint(
                     endpoint.Address.Equals(IPAddress.Any) ? IPAddress.Loopback :
                     endpoint.Address.Equals(IPAddress.IPv6Any) ? IPAddress.IPv6Loopback : endpoint.Address,
@@ -63,7 +67,7 @@ public static class RelayGameDiscovery
         Task Queue(IPEndPoint endpoint, bool viaLan = false)
         {
             var pending = viaLan ? lanChecks : checks;
-            if (RelayRoomClient.IsLocalRoomPort(endpoint.Port) || pending.Count >= (viaLan ? 64 : 192))
+            if (IsInternalPort(endpoint.Port) || pending.Count >= (viaLan ? 64 : 192))
                 return Task.CompletedTask;
             return pending.GetOrAdd(endpoint, key => new Lazy<Task>(() => VerifyAsync(key, viaLan ? lanGate : gate))).Value;
         }
@@ -85,7 +89,7 @@ public static class RelayGameDiscovery
                     var packet = await receiver.ReceiveAsync(listening.Token).ConfigureAwait(false);
                     if (packet.Buffer.Length > 4096 || !IsLocalAddress(packet.RemoteEndPoint.Address, localAddresses)) continue;
                     var text = Encoding.UTF8.GetString(packet.Buffer);
-                    if (!TryParseAnnouncement(text, out var name, out var port) || RelayRoomClient.IsLocalRoomPort(port)) continue;
+                    if (!TryParseAnnouncement(text, out var name, out var port) || IsInternalPort(port)) continue;
                     var endpoint = new IPEndPoint(packet.RemoteEndPoint.Address, port);
                     if (lanChecks.Count >= 64 && !lanChecks.ContainsKey(endpoint)) continue;
                     if (name.Length > 0) names[endpoint] = name;

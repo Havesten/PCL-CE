@@ -141,7 +141,10 @@ public sealed record RelayStatus(
     [property: JsonPropertyName("region_allowed")] bool RegionAllowed = true,
     [property: JsonPropertyName("region")] string? Region = null,
     [property: JsonPropertyName("room_codes")] bool RoomCodes = false,
-    [property: JsonPropertyName("room_code_prefix")] string? RoomCodePrefix = null);
+    [property: JsonPropertyName("room_code_prefix")] string? RoomCodePrefix = null,
+    [property: JsonPropertyName("p2p_enabled")] bool P2pEnabled = true,
+    [property: JsonPropertyName("relay_enabled")] bool RelayEnabled = true,
+    [property: JsonPropertyName("p2p_room_codes")] bool P2pRoomCodes = false);
 
 internal sealed record RelayErrorBody(
     [property: JsonPropertyName("error")] string? Error,

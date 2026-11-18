@@ -1,574 +1,531 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Threading;
 using PCL.Core.App;
+using PCL.Core.App.IoC;
 using PCL.Core.Link;
 using PCL.Core.Link.EasyTier;
 using PCL.Core.Link.Lobby;
+using PCL.Core.Link.Relay;
 using PCL.Core.Link.Scaffolding.EasyTier;
+using PCL.Core.UI.Dialogs;
 
 namespace PCL;
 
-/// <summary>
-///     房间码匹配网络身份，通过共享节点会合后由 EasyTier 尝试 P2P 打洞。
-/// </summary>
-/// <remarks>
-///     房主点「创建房间」会生成一段房间码（网络名称 + 密钥 + 端口），发给朋友后由对方粘贴即可加入，
-///     不再需要双方对着屏幕抄三行参数。协议栈（IPv4 / IPv6）在本页单独选择，只影响本机。
-/// </remarks>
 public partial class PageLinkP2P : IPageView
 {
-    /// <summary>房主固定的虚拟 IP，EasyTier 启动参数里写死。</summary>
-    private const string HostVirtualIp = "10.114.51.41";
-
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
-
-    private bool _busy;
-    private bool _starting;
-    private bool _refreshing;
-    private CancellationTokenSource? _natDetection;
+    private readonly RelayApi _api = new();
+    private RelaySession _session = RelaySession.Load();
+    private RelayStatus? _policy;
+    private RelayCaptcha? _captcha;
     private CliNetTest.NetStatus? _natStatus;
     private DateTime _natCheckedAt;
-    private DateTime _connectedAt;
-    private DateTime? _peerSeenAt;
-    private int _gamePort = 25565;
-    private bool _isHost = true;
-    private string _name = LinkCode.NewName();
-    private string _secret = LinkCode.NewSecret();
-
-    /// <summary>由代码改写控件状态时置位，避免回写配置或重复解析。</summary>
-    private bool _suppressEvents;
+    private IReadOnlyList<RelayGameServer> _games = [];
+    private P2pCloudRoom? _room;
+    private P2pRoomLease? _lease;
+    private P2pGameProxy? _hostBridge;
+    private P2pGameProxy? _guestEntrance;
+    private int _bridgePort;
+    private P2pLanPublisher? _lan;
+    private Process? _process;
+    private CancellationTokenSource? _connection;
+    private Task? _monitor;
+    private Task? _startup;
+    private Task? _shutdown;
+    private CancellationTokenSource? _attempt;
+    private Action<string>? _leaseClosed;
+    private readonly object _launchState = new();
+    private long _generation;
+    private bool _starting;
+    private bool _working;
+    private bool _detecting;
+    private bool _connected;
+    private bool _stopping;
+    private volatile bool _exiting;
+    private bool _suppress;
+    private bool _pathFailed;
+    private readonly CancellationTokenSource _operations = new();
+    private bool IsHost => RadioHost.Checked;
 
     public PageLinkP2P()
     {
-        _suppressEvents = true;
+        _suppress = true;
         InitializeComponent();
-        _suppressEvents = false;
-        _timer.Tick += async (_, _) => await RefreshRuntimeAsync();
-        Loaded += (_, _) => { RefreshAll(); if (_busy) _timer.Start(); };
-        Unloaded += (_, _) => { _timer.Stop(); _natDetection?.Cancel(); };
+        if (Config.Link.IpMode == LinkIpMode.Ipv4Only) RadioIpV4.Checked = true;
+        else if (Config.Link.IpMode == LinkIpMode.Ipv6Only) RadioIpV6.Checked = true;
+        _suppress = false;
+        Loaded += async (_, _) => { UpdateMode(); await RefreshConfigAsync(); };
+        Application.Current.Exit += (_, _) => OnExit();
+        Lifecycle.When(LifecycleState.Exiting, OnExit);
     }
+    public async void OnNavigatedTo(object? parameter) { await RefreshConfigAsync(); }
+    public void OnNavigatedFrom() { }
 
-    public void OnNavigatedTo(object? parameter)
+    private async Task RefreshConfigAsync()
     {
-        RefreshAll();
-    }
-
-    public void OnNavigatedFrom()
-    {
-    }
-
-    // ---------------------------------------------------------------- 初始化
-
-    private void RefreshAll()
-    {
-        _suppressEvents = true;
+        if (_working || _exiting) return;
+        _working = true;
         try
         {
-            switch (Config.Link.IpMode)
+            _session = RelaySession.Load();
+            _api.Token = _session.IsValid ? _session.Token : null;
+            _policy = await _api.GetStatusAsync(_operations.Token);
+            LabAccount.Text = _session.IsValid ? _session.Email : "登录后可创建或加入房间";
+            BtnAccount.Text = _session.IsValid ? "退出登录" : "登录账号";
+            if (!_policy.P2pEnabled) LabStatus.Text = "P2P 联机已由管理员关闭";
+            else if (!_policy.P2pRoomCodes) LabStatus.Text = "请先升级云端以启用 P2P 房间码";
+            else if (_policy.RequiredVersion is { Length: > 0 } version && version != Basics.VersionName)
+                LabStatus.Text = "版本过低，需要更新";
+            else if (_policy.RegionCheck && !_policy.RegionAllowed)
+                LabStatus.Text = "当前地区无法使用联机功能";
+            else if (_session.IsValid && !_connected)
             {
-                case LinkIpMode.Ipv4Only:
-                    RadioIpV4.Checked = true;
-                    break;
-                case LinkIpMode.Ipv6Only:
-                    RadioIpV6.Checked = true;
-                    break;
-                default:
-                    RadioIpAuto.Checked = true;
-                    break;
+                var selected = (ComboNodes.SelectedItem as P2pRendezvousNode)?.Id;
+                var nodes = await _api.GetP2pNodesAsync(_operations.Token);
+                ComboNodes.ItemsSource = nodes;
+                ComboNodes.SelectedItem = nodes.FirstOrDefault(n => n.Id == selected) ?? nodes.FirstOrDefault();
+                if (nodes.Count == 0) LabStatus.Text = "暂无可用会合节点，请联系管理员";
             }
-
-            if (!_busy)
-            {
-                if (Config.Link.RendezvousPeer == "tcp://public.easytier.top:11010")
-                    Config.Link.RendezvousPeer = "tcp://et.starvm.top:11010";
-                TextPeer.Text = RadioPunch.Checked ? Config.Link.RendezvousPeer : Config.Link.ManualPeer;
-            }
-            TextListenPort.Text = Config.Link.ManualPort > 0
-                ? Config.Link.ManualPort.ToString()
-                : PeerAddress.DefaultPort.ToString();
         }
-        finally
-        {
-            _suppressEvents = false;
-        }
-
-        UpdateIpHint();
-        UpdateModeUi();
+        catch (OperationCanceledException) when (_operations.IsCancellationRequested) { }
+        catch (Exception ex) { ShowError(ex); }
+        finally { _working = false; UpdateButtons(); }
     }
 
-    /// <summary>按当前是房主还是玩家，切换可见区域与文案。</summary>
-    private void UpdateModeUi()
+    private void RadioMode_Check(object sender, Common.RouteEventArgs e) { if (!_suppress) UpdateMode(); }
+    private void UpdateMode()
     {
-        _isHost = RadioHost.Checked;
-
-        PanHostCode.Visibility = _isHost ? Visibility.Visible : Visibility.Collapsed;
-        PanJoinCode.Visibility = _isHost ? Visibility.Collapsed : Visibility.Visible;
-        PanPort.Visibility = _isHost ? Visibility.Visible : Visibility.Collapsed;
-        PanListenPort.Visibility = _isHost ? Visibility.Visible : Visibility.Collapsed;
-
-        BtnStart.Text = _isHost ? "创建房间" : "加入房间";
-        LabModeHint.Text = _isHost
-            ? "游戏开在你的这台电脑上。创建房间后把房间码发给朋友，他们就能连进来。"
-            : "游戏开在朋友那台电脑上。把房主给你的房间码粘贴到下面，再点「加入房间」。";
-
-        if (!_isHost && string.IsNullOrWhiteSpace(TextJoinCode.Text))
-            LabParseHint.Text = "还没有粘贴房间码。";
-
-        UpdateCode();
-        UpdatePeerHint();
+        PanHost.Visibility = IsHost ? Visibility.Visible : Visibility.Collapsed;
+        TextJoinCode.Visibility = IsHost ? Visibility.Collapsed : Visibility.Visible;
+        LabModeHint.Text = IsHost ? "请在游戏内开启局域网联机。" : "输入房间码，连接后在游戏的多人游戏列表进入。";
+        BtnStart.Text = IsHost ? "创建房间" : "加入房间";
+        BtnStop.Text = IsHost ? "关闭房间" : "退出房间";
+        UpdateButtons();
     }
-
-    /// <summary>会合节点帮助双方交换地址，不要求双方持有独立公网 IP。</summary>
-    private void UpdatePeerHint()
-    {
-        var peerFilled = !string.IsNullOrWhiteSpace(TextPeer.Text);
-        var peerValid = PeerAddress.TryParse(TextPeer.Text, out _, out _);
-        var punching = RadioPunch.Checked;
-
-        LabPeerLabel.Text = punching ? "会合节点" : (_isHost ? "玩家地址" : "房主地址");
-        TextPeer.HintText = punching
-            ? "双方使用同一会合节点，例如 tcp://et.starvm.top:11010"
-            : "输入对方可访问的公网 IP:端口或域名:端口";
-        LabPeerHint.Text = peerFilled && peerValid
-            ? punching
-                ? "双方填写相同的会合节点并使用相同的房间码。会合节点只交换连接信息；游戏数据必须 P2P 直传，不会中继。"
-                : "此地址只用于直接连接对方，不经过会合节点；需确保端口可从互联网访问。"
-            : punching
-                ? "请填写有效的 EasyTier 会合节点地址；双方必须能访问同一个节点。"
-                : "请填写对方可访问的 IP 或域名及监听端口。";
-        LabRendezvousHint.Text = punching
-            ? "会合节点仅帮助双方发现和协商连接，不转发游戏数据。此模式强制 P2P 直连；打洞失败时不会回退中继，请改用左侧「中继联机」。"
-            : "手动直连不使用会合节点或中继；双方必须预先知道对方地址并允许 EasyTier 监听端口通过防火墙。";
-    }
-
-    private void RadioConnection_Check(object sender, Common.RouteEventArgs e)
-    {
-        if (_suppressEvents || _busy) return;
-        TextPeer.Text = RadioPunch.Checked ? Config.Link.RendezvousPeer : Config.Link.ManualPeer;
-        UpdatePeerHint();
-    }
-
-    /// <summary>重算房间码并刷新显示。玩家的码由粘贴决定，这里只展示解析结果。</summary>
-    private void UpdateCode()
-    {
-        LabCode.Text = LinkCode.Build(_name, _secret, _gamePort);
-    }
-
-    private void UpdateIpHint()
-    {
-        LabIpHint.Text = Config.Link.IpMode switch
-        {
-            LinkIpMode.Ipv4Only =>
-                "只走 IPv4，关闭 IPv6 监听与打洞。IPv6 线路不稳定、或者打洞反复失败时选这个。",
-            LinkIpMode.Ipv6Only =>
-                "只监听 IPv6，不监听 IPv4。需要你和对方都有可路由的 IPv6 地址，任何一方没有公网 IPv6 都连不上。",
-            _ =>
-                "同时尝试 IPv4 与 IPv6，由 EasyTier 自动挑选能打通的路径。没有特殊理由就保持自动。"
-        };
-        LabIpHint.Text += "\n协议只影响本机，对方用自己的设置；改动在下一次连接时生效。";
-    }
-
-    // ---------------------------------------------------------------- 交互
-
-    private void RadioMode_Check(object sender, Common.RouteEventArgs e)
-    {
-        if (_suppressEvents || _busy) return;
-        UpdateModeUi();
-    }
-
     private void RadioIp_Check(object sender, Common.RouteEventArgs e)
     {
-        if (_suppressEvents) return;
-
-        Config.Link.IpMode = RadioIpV4.Checked ? LinkIpMode.Ipv4Only
-            : RadioIpV6.Checked ? LinkIpMode.Ipv6Only
-            : LinkIpMode.Auto;
-
-        UpdateIpHint();
+        if (_suppress) return;
+        Config.Link.IpMode = RadioIpV4.Checked ? LinkIpMode.Ipv4Only : RadioIpV6.Checked ? LinkIpMode.Ipv6Only : LinkIpMode.Auto;
+        _pathFailed = false;
+        LabNatAdvice.Text = P2pReadiness.Assess(_natStatus, Config.Link.IpMode).Summary;
+        UpdateButtons();
     }
-
-    private void BtnRegen_Click(object sender, MouseButtonEventArgs e)
+    private void UpdateButtons()
     {
-        _name = LinkCode.NewName();
-        _secret = LinkCode.NewSecret();
-        UpdateCode();
-        LabStatus.Text = "已生成新的房间码，之前发出去的码作废";
-    }
-
-    private void BtnCopyCode_Click(object sender, MouseButtonEventArgs e) =>
-        CopyToClipboard(LabCode.Text, "房间码已复制");
-
-    private void BtnCopyAddress_Click(object sender, MouseButtonEventArgs e) =>
-        CopyToClipboard(LabAddress.Text, "地址已复制");
-
-    private void CopyToClipboard(string text, string okMessage)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return;
-        try
-        {
-            Clipboard.SetText(text);
-            LabStatus.Text = okMessage;
-        }
-        catch (Exception)
-        {
-            LabStatus.Text = "复制失败，请手动选中后按 Ctrl+C";
-        }
-    }
-
-    private void TextGamePort_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_suppressEvents) return;
-        if (!int.TryParse(TextGamePort.Text.Trim(), out var port) || port is < 1 or > 65535)
-            return;
-        _gamePort = port;
-        UpdateCode();
-    }
-
-    private void TextPeer_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_suppressEvents) return;
-        UpdatePeerHint();
-    }
-
-    private void TextJoinCode_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_suppressEvents || _busy) return;
-
-        var raw = TextJoinCode.Text;
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            LabParseHint.Text = "还没有粘贴房间码。";
-            return;
-        }
-
-        if (LinkCode.TryParse(raw, out var name, out var secret, out var port))
-        {
-            _name = name;
-            _secret = secret;
-            _gamePort = port;
-            LabParseHint.Text = $"已识别：端口 {port}";
-        }
-        else
-        {
-            LabParseHint.Text = "房间码不完整或格式不对，应当有 18 位字符、中间用连字符分成 4 段。";
-        }
-    }
-
-    // ---------------------------------------------------------------- 连接
-
-    private async void BtnStart_Click(object sender, MouseButtonEventArgs e)
-    {
-        if (_busy || _starting || _natDetection is not null) return;
-
-        if (_isHost)
-        {
-            if (!int.TryParse(TextGamePort.Text.Trim(), out var port) || port is < 1 or > 65535)
-            {
-                LabStatus.Text = "游戏端口需要填 1-65535 之间的数字";
-                return;
-            }
-
-            _gamePort = port;
-        }
-        else if (!LinkCode.TryParse(TextJoinCode.Text, out var name, out var secret, out var port2))
-        {
-            LabStatus.Text = "请先粘贴有效的房间码";
-            return;
-        }
-        else
-        {
-            _name = name;
-            _secret = secret;
-            _gamePort = port2;
-        }
-
-        var punching = RadioPunch.Checked;
-        var peers = Array.Empty<string>();
-        var peerText = TextPeer.Text.Trim();
-        if (peerText.Length > 0)
-        {
-            if (!PeerAddress.TryParse(peerText, out peers, out var peerError))
-            {
-                LabStatus.Text = peerError;
-                UpdatePeerHint();
-                return;
-            }
-        }
-        else
-        {
-            LabStatus.Text = punching ? "请先填写双方共用的 EasyTier 会合节点" : "请先填写对方可访问的地址";
-            return;
-        }
-
-        if (!int.TryParse(TextListenPort.Text.Trim(), out var listenPort) || listenPort is < 1 or > 65535)
-        {
-            LabStatus.Text = "监听端口需要填 1-65535 之间的数字";
-            return;
-        }
-
-        if (ETController.Precheck() != 0)
-        {
-            LabStatus.Text = "正在下载 EasyTier，下载完成后请再点一次";
-            GameLink.DownloadEasyTier();
-            return;
-        }
-
-        _starting = true;
-        SetBusy(false);
-        try
-        {
-            if (punching && (_natStatus is null || DateTime.UtcNow - _natCheckedAt > TimeSpan.FromMinutes(2)))
-                await DetectNatAsync();
-            if (!IsLoaded) return;
-            if (punching && _natStatus is null)
-            {
-                ShowConnectionError("NAT 检测失败，尚不能判断打洞条件。请重新检测或选择中继联机。");
-                return;
-            }
-            if (punching && _natStatus!.UdpNatType == CliNetTest.NatType.Unknown &&
-                _natStatus.TcpNatType == CliNetTest.NatType.Unknown &&
-                (Config.Link.IpMode == LinkIpMode.Ipv4Only || !_natStatus.SupportIPv6))
-            {
-                ShowConnectionError("未能检测到可评估的 NAT 类型或公网 IPv6，暂不能确认打洞条件。请检查网络并重新检测，或使用中继联机。");
-                return;
-            }
-            if (punching && Config.Link.IpMode == LinkIpMode.Ipv6Only && !_natStatus!.SupportIPv6)
-            {
-                ShowConnectionError("未检测到可用公网 IPv6，请改用自动或仅 IPv4 后重试。");
-                return;
-            }
-
-        if (ETController.Status != ETState.Stopped) ETController.Exit();
-
-        // 记住这次的填法，下次打开页面直接带出来
-        if (punching) Config.Link.RendezvousPeer = peerText;
-        else Config.Link.ManualPeer = peerText;
-        Config.Link.ManualPort = listenPort;
-
-        // 这里不经过大厅服务端，直接构造一份等价的大厅信息交给 EasyTier。
-        LobbyInfoProvider.TargetLobby = new LobbyInfoProvider.LobbyInfo
-        {
-            OriginalCode = $"{_name}-{_secret}",
-            Type = LobbyInfoProvider.LobbyType.PCLCE,
-            NetworkName = _name,
-            NetworkSecret = _secret,
-            Port = _gamePort,
-            Ip = HostVirtualIp
-        };
-
-        if (ETController.Launch(_isHost, null, peers, listenPort, holePunching: punching) != 0)
-        {
-            LabStatus.Text = "启动 EasyTier 失败，请查看日志";
-            return;
-        }
-
-        SetBusy(true);
-        LoadConnection.Visibility = Visibility.Visible;
-        LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Run;
-        PanAddress.Visibility = Visibility.Collapsed;
-        PanRuntime.Visibility = Visibility.Visible;
-        LabAddress.Text = _isHost ? $"{HostVirtualIp}:{_gamePort}" : $"127.0.0.1:{LobbyInfoProvider.JoinerLocalPort}";
-        LabAddressHint.Text = _isHost
-            ? "把房间码和会合节点发给朋友；朋友加入后使用自己页面显示的本地地址进游戏"
-            : "进游戏用「直接连接」填这个地址";
-        LabStatus.Text = _isHost ? "正在创建房间…" : "正在加入房间…";
-        LabPeerCount.Text = "—";
-        LabPeerRoute.Text = "—";
-        LabPeerPing.Text = "—";
-        LabRemoteNat.Text = "等待对方加入后读取其 NAT 类型。";
-        _connectedAt = DateTime.UtcNow;
-        _peerSeenAt = null;
-        _timer.Start();
-        }
-        catch (Exception ex)
-        {
-            Common.Log(ex, "[Link] P2P 连接失败");
-            ResetToIdle("启动连接失败，请查看日志或使用中继联机。");
-        }
-        finally
-        {
-            _starting = false;
-            SetBusy(_busy);
-        }
-    }
-
-    private async void BtnDetectNat_Click(object sender, MouseButtonEventArgs e)
-    {
-        if (_starting || _natDetection is not null) return;
-        if (ETController.Precheck() != 0)
-        {
-            LabNatType.Text = "正在从官方发布页下载 EasyTier，完成后请再次检测。";
-            GameLink.DownloadEasyTier();
-            return;
-        }
-        await DetectNatAsync();
-    }
-
-    private async Task DetectNatAsync()
-    {
-        using var cancellation = new CancellationTokenSource();
-        _natDetection = cancellation;
-        _natStatus = null;
-        SetBusy(_busy);
-        LabNatType.Text = "正在检测 UDP / TCP NAT 类型，最长约 30 秒…";
-        LabNatAdvice.Text = "检测直接访问 STUN 服务，网络代理与实际游戏网络可能不同。";
-        try
-        {
-            _natStatus = await CliNetTest.GetNetStatusAsync(cancellation.Token);
-            _natCheckedAt = DateTime.UtcNow;
-            LabNatType.Text = _natStatus is null ? "检测失败或超时：无法判断 NAT 类型。" :
-                $"UDP：{CliNetTest.GetNatTypeString(_natStatus.UdpNatType)}　TCP：{CliNetTest.GetNatTypeString(_natStatus.TcpNatType)}\n公网 IPv6：{(_natStatus.SupportIPv6 ? "已检测到" : "未检测到")}";
-            LabNatAdvice.Text = CliNetTest.GetPunchingAdvice(_natStatus?.UdpNatType ?? CliNetTest.NatType.Unknown)
-                                + "\n请朋友也检测一次；NAT1 不是打洞的唯一可用类型，也不能保证任意两端一定成功。";
-        }
-        catch (OperationCanceledException)
-        {
-            _natStatus = null;
-            LabNatType.Text = "检测已取消，可重新检测。";
-        }
-        finally
-        {
-            _natDetection = null;
-            SetBusy(_busy);
-        }
-    }
-
-    private void BtnStop_Click(object sender, MouseButtonEventArgs e) => ResetToIdle("已断开", false);
-
-    private void ShowConnectionError(string message)
-    {
-        LabStatus.Text = message;
-        LoadConnection.TextError = message;
-        LoadConnection.Visibility = Visibility.Visible;
-        LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Error;
-    }
-
-    private void ResetToIdle(string message, bool failed = true)
-    {
-        _timer.Stop();
-        ETController.Exit();
-        SetBusy(false);
-        PanAddress.Visibility = Visibility.Collapsed;
-        PanRuntime.Visibility = Visibility.Collapsed;
-        LabStatus.Text = message;
-        LoadConnection.Visibility = failed ? Visibility.Visible : Visibility.Collapsed;
-        LoadConnection.TextError = message;
-        LoadConnection.State.LoadingState = failed ? MyLoading.MyLoadingState.Error : MyLoading.MyLoadingState.Stop;
-        _peerSeenAt = null;
-    }
-
-    private void SetBusy(bool connected)
-    {
-        _busy = connected;
-        var idle = !connected && !_starting && _natDetection is null;
-        BtnStart.IsEnabled = idle;
-        BtnDetectNat.IsEnabled = !_starting && _natDetection is null;
-        BtnStop.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
-
+        var idle = !_working && !_detecting && !_connected && !_stopping && !_exiting;
+        var permitted = _policy is { P2pEnabled: true, P2pRoomCodes: true } &&
+            (!_policy.RegionCheck || _policy.RegionAllowed) &&
+            (string.IsNullOrEmpty(_policy.RequiredVersion) || _policy.RequiredVersion == Basics.VersionName);
+        BtnStart.IsEnabled = idle && permitted && _session.IsValid && !_pathFailed &&
+            P2pReadiness.Assess(_natStatus, Config.Link.IpMode).CanAttempt;
+        BtnDetectNat.IsEnabled = !_working && !_detecting && !_stopping && !_exiting;
+        BtnStop.Visibility = _connected || _starting ? Visibility.Visible : Visibility.Collapsed;
+        BtnStop.Text = _starting ? "取消连接" : IsHost ? "关闭房间" : "退出房间";
+        BtnStop.IsEnabled = (_starting || !_working) && !_stopping && !_exiting;
         RadioHost.IsEnabled = idle;
         RadioJoin.IsEnabled = idle;
         RadioIpAuto.IsEnabled = idle;
         RadioIpV4.IsEnabled = idle;
         RadioIpV6.IsEnabled = idle;
-        TextGamePort.IsEnabled = idle;
         TextJoinCode.IsEnabled = idle;
-        TextPeer.IsEnabled = idle;
-        TextListenPort.IsEnabled = idle;
-        BtnRegen.IsEnabled = idle;
-        RadioPunch.IsEnabled = idle;
-        RadioDirect.IsEnabled = idle;
+        ComboNodes.IsEnabled = idle;
+        ComboGames.IsEnabled = idle;
+        BtnAccount.IsEnabled = idle;
+        BtnLogin.IsEnabled = idle;
+        BtnCaptcha.IsEnabled = idle;
+        BtnSendCode.IsEnabled = idle;
     }
 
-    // ---------------------------------------------------------------- 运行信息
-
-    private async Task RefreshRuntimeAsync()
+    private async void BtnAccount_Click(object sender, MouseButtonEventArgs e)
     {
-        if (!_busy || _refreshing) return;
-        _refreshing = true;
+        if (_working || _connected) return;
+        if (_session.IsValid)
+        {
+            _session.Clear(); _api.Token = null;
+            await RefreshConfigAsync();
+        }
+        else
+        {
+            PanLogin.Visibility = PanLogin.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+            if (PanLogin.Visibility == Visibility.Visible) await LoadCaptchaAsync();
+        }
+    }
+    private async Task LoadCaptchaAsync()
+    {
+        try { _captcha = await _api.GetCaptchaAsync(_operations.Token); LabCaptcha.Text = _captcha.Prompt; TextCaptcha.Text = ""; }
+        catch (OperationCanceledException) when (_operations.IsCancellationRequested) { }
+        catch (Exception ex) { if (!_exiting) LabCaptcha.Text = ex.Message; }
+    }
+    private async void BtnCaptcha_Click(object sender, MouseButtonEventArgs e) => await LoadCaptchaAsync();
+    private async void BtnSendCode_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_working || _captcha is null) return;
+        _working = true; UpdateButtons();
         try
         {
-
-        // 进程被关掉或自己退出，界面不能一直停在「正在创建」
-        var process = ETController.ETProcess;
-        if (process is null || process.HasExited)
+            await _api.SendCodeAsync(TextEmail.Text.Trim(), _captcha.Id, TextCaptcha.Text.Trim(), _operations.Token);
+            LabStatus.Text = "验证码已发送，请查看邮箱";
+            await LoadCaptchaAsync();
+        }
+        catch (OperationCanceledException) when (_operations.IsCancellationRequested) { }
+        catch (Exception ex) { ShowError(ex); await LoadCaptchaAsync(); }
+        finally { _working = false; UpdateButtons(); }
+    }
+    private async void BtnLogin_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_working) return;
+        _working = true; UpdateButtons();
+        try
         {
-            ResetToIdle("连接已结束，可以重新创建房间");
+            var result = await _api.LoginAsync(TextEmail.Text.Trim(), TextEmailCode.Text.Trim(), _operations.Token);
+            _session.Token = result.Token; _session.Email = TextEmail.Text.Trim(); _session.ExpiresAt = result.ExpiresAt; _session.Save();
+            PanLogin.Visibility = Visibility.Collapsed;
+            LabStatus.Text = "登录成功";
+        }
+        catch (OperationCanceledException) when (_operations.IsCancellationRequested) { }
+        catch (Exception ex) { ShowError(ex); }
+        finally { _working = false; }
+        await RefreshConfigAsync();
+    }
+
+    private void ShowError(Exception ex)
+    {
+        if (_exiting) return;
+        if (ex is RelayApiException { Status: HttpStatusCode.Unauthorized })
+        {
+            _session.Clear(); _api.Token = null;
+            LabAccount.Text = "登录已过期，请重新登录"; BtnAccount.Text = "登录账号";
+            PanLogin.Visibility = Visibility.Visible;
+        }
+        LabStatus.Text = ex.Message;
+    }
+
+    private async Task<bool> CheckAccountAsync(CancellationToken ct)
+    {
+        _session = RelaySession.Load();
+        _api.Token = _session.IsValid ? _session.Token : null;
+        if (!_session.IsValid) throw new InvalidOperationException("请先登录账号");
+        var me = await _api.GetMeAsync(ct);
+        if (me.IsBanned) throw new InvalidOperationException("账号已被封禁");
+        if (!me.PhoneRequired) return true;
+        await DialogService.Instance.ShowAsync(new PhoneBindDialogRequest
+        {
+            Title = "绑定手机号", Content = "请绑定手机号后使用联机功能。", ForceWait = true,
+            Buttons = DialogButtons.From(DialogButton.Create("绑定手机号"), DialogButton.Create("稍后再说")),
+            GetCaptchaAsync = async () => { var cap = await _api.GetCaptchaAsync(ct); return (cap.Id, cap.Prompt); },
+            SendSmsAsync = (phone, id, answer) => _api.SendSmsCodeAsync(phone, id, answer, ct),
+            BindAsync = (phone, code) => _api.BindPhoneAsync(phone, code, ct)
+        });
+        ct.ThrowIfCancellationRequested();
+        return !(await _api.GetMeAsync(ct)).PhoneRequired;
+    }
+
+    private async void BtnDetectNat_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_working || _detecting) return;
+        try { await DetectNatAsync(_operations.Token); }
+        catch (OperationCanceledException) { }
+    }
+    private async Task DetectNatAsync(CancellationToken ct)
+    {
+        if (ETController.Precheck() != 0)
+        {
+            LabNatType.Text = "正在准备联机组件，请完成后重新检测。";
+            GameLink.DownloadEasyTier(); return;
+        }
+        _detecting = true; UpdateButtons();
+        LabNatType.Text = "正在检测…"; LabNatAdvice.Text = "";
+        try
+        {
+            _natStatus = await CliNetTest.GetNetStatusAsync(ct);
+            _natCheckedAt = DateTime.UtcNow;
+            _pathFailed = false;
+            LabNatType.Text = _natStatus is null ? "检测失败或超时" :
+                $"UDP：{CliNetTest.GetNatTypeString(_natStatus.UdpNatType)}　TCP：{CliNetTest.GetNatTypeString(_natStatus.TcpNatType)}\nIPv6：{(_natStatus.SupportIPv6 ? "可用" : "未检测到")}";
+            LabNatAdvice.Text = P2pReadiness.Assess(_natStatus, Config.Link.IpMode).Summary;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex) { if (!_exiting) LabNatType.Text = ex.Message; }
+        finally { _detecting = false; UpdateButtons(); }
+    }
+
+    private async void BtnStart_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_working || _connected || _detecting || _pathFailed || _stopping || _exiting) return;
+        _working = true; _starting = true;
+        _attempt = CancellationTokenSource.CreateLinkedTokenSource(_operations.Token);
+        var generation = Interlocked.Increment(ref _generation);
+        UpdateButtons();
+        _startup = StartCoreAsync(IsHost, generation, _attempt.Token);
+        try { await _startup; }
+        finally
+        {
+            _starting = false; _working = false; _startup = null;
+            _attempt.Dispose(); _attempt = null;
+            UpdateButtons();
+        }
+    }
+
+    private async Task StartCoreAsync(bool hosting, long generation, CancellationToken ct)
+    {
+        P2pCloudRoom? allocated = null;
+        var ownedByLease = false;
+        try
+        {
+            _policy = await _api.GetStatusAsync(ct);
+            if (!_policy.P2pEnabled || !_policy.P2pRoomCodes) throw new InvalidOperationException("P2P 联机暂不可用，请联系管理员");
+            if (_policy.RegionCheck && !_policy.RegionAllowed) throw new InvalidOperationException("当前地区无法使用联机功能");
+            if (!string.IsNullOrEmpty(_policy.RequiredVersion) && _policy.RequiredVersion != Basics.VersionName)
+                throw new InvalidOperationException("版本过低，需要更新");
+            if (!await CheckAccountAsync(ct)) { LabStatus.Text = "绑定手机号后可使用联机"; return; }
+            ct.ThrowIfCancellationRequested();
+            if (ETController.Precheck() != 0) { GameLink.DownloadEasyTier(); LabStatus.Text = "正在准备联机组件，请完成后重试"; return; }
+            if (_natStatus is null || DateTime.UtcNow - _natCheckedAt > TimeSpan.FromMinutes(2)) await DetectNatAsync(ct);
+            ct.ThrowIfCancellationRequested();
+            var assessment = P2pReadiness.Assess(_natStatus, Config.Link.IpMode);
+            if (!assessment.CanAttempt) throw new InvalidOperationException(assessment.Summary);
+            if (ETController.Status != ETState.Stopped) throw new InvalidOperationException("已有 P2P 连接，请先断开");
+            RelayGameServer? game = null;
+            if (hosting)
+            {
+                var nodes = await _api.GetP2pNodesAsync(ct);
+                var selected = ComboNodes.SelectedItem as P2pRendezvousNode;
+                var node = nodes.FirstOrDefault(n => n.Id == selected?.Id) ?? nodes.FirstOrDefault();
+                if (node is null) throw new InvalidOperationException("暂无可用会合节点，请联系管理员");
+                var selectedGame = (ComboGames.SelectedItem as RelayGameServer)?.Endpoint;
+                LabStatus.Text = "正在识别游戏…";
+                _games = await RelayGameDiscovery.ScanAsync(ct);
+                ComboGames.ItemsSource = _games;
+                ComboGames.Visibility = _games.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+                ComboGames.SelectedItem = _games.FirstOrDefault(g => g.Endpoint.Equals(selectedGame)) ?? (_games.Count == 1 ? _games[0] : null);
+                game = ComboGames.SelectedItem as RelayGameServer ?? (_games.Count == 1 ? _games[0] : null);
+                if (game is null) { LabStatus.Text = _games.Count == 0 ? "请在游戏内开启局域网联机" : "请选择要分享的游戏，再创建房间"; return; }
+                var verified = await MinecraftServerProbe.ProbeAsync(game.Endpoint, TimeSpan.FromSeconds(3), ct);
+                if (verified is null) { _games = []; throw new InvalidOperationException("游戏已关闭，请重新开启局域网联机"); }
+                lock (_launchState)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    _hostBridge = new P2pGameProxy(game.Endpoint);
+                    _hostBridge.Start();
+                    _bridgePort = _hostBridge.LocalEndpoint.Port;
+                }
+                allocated = await _api.CreateP2pRoomAsync(node.Id, game.Name, game.Version, _bridgePort, ct);
+                _room = allocated;
+            }
+            else _room = await _api.JoinP2pRoomAsync(TextJoinCode.Text, ct);
+            ValidateRoom(_room);
+            ct.ThrowIfCancellationRequested();
+            var peer = _room.RendezvousUri;
+            if (Config.Link.IpMode == LinkIpMode.Ipv6Only)
+            {
+                var uri = new Uri(peer);
+                var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, ct);
+                var address = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6);
+                if (address is null) throw new InvalidOperationException("会合节点未提供 IPv6，请改用自动");
+                peer = $"{uri.Scheme}://[{address}]:{uri.Port}";
+            }
+            lock (_launchState)
+            {
+                ct.ThrowIfCancellationRequested();
+                LobbyInfoProvider.TargetLobby = new LobbyInfoProvider.LobbyInfo
+                {
+                    OriginalCode = _room.Code, Type = LobbyInfoProvider.LobbyType.PCLCE,
+                    NetworkName = _room.NetworkName, NetworkSecret = _room.NetworkSecret, Port = _room.GamePort, Ip = "10.114.51.41"
+                };
+                if (ETController.Launch(hosting, peers: [peer], listenPort: 0, holePunching: true) != 0)
+                    throw new InvalidOperationException("联机组件启动失败");
+                _process = ETController.ETProcess ?? throw new InvalidOperationException("联机组件启动失败");
+                _connection = CancellationTokenSource.CreateLinkedTokenSource(_operations.Token);
+                _connected = true;
+            }
+            var process = _process;
+            var hostGame = game;
+            P2pRoomLease lease;
+            lock (_launchState)
+            {
+                ct.ThrowIfCancellationRequested();
+                lease = new P2pRoomLease(_api, _room, hosting, async token =>
+                    ReferenceEquals(process, ETController.ETProcess) && !process.HasExited && hostGame is not null &&
+                    await MinecraftServerProbe.ProbeAsync(hostGame.Endpoint, TimeSpan.FromSeconds(3), token) is not null);
+                _lease = lease; ownedByLease = true;
+                _leaseClosed = message => Dispatcher.BeginInvoke(new Action(async () =>
+                {
+                    if (generation == Interlocked.Read(ref _generation) && ReferenceEquals(_lease, lease) && !_exiting)
+                        await StopAsync(message);
+                }));
+                lease.Closed += _leaseClosed;
+            }
+            await lease.StartAsync(ct);
+            lock (_launchState)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!hosting)
+                {
+                    _guestEntrance = new P2pGameProxy(new IPEndPoint(IPAddress.Loopback, LobbyInfoProvider.JoinerLocalPort), acceptLocalInterfaces: true);
+                    _guestEntrance.Start();
+                    _lan = new P2pLanPublisher(_room.Name, _guestEntrance.LocalEndpoint.Port);
+                }
+            }
+            LabCode.Text = _room.Code; PanCode.Visibility = Visibility.Visible;
+            LabStatus.Text = hosting ? "房间已创建，请分享房间码" : "正在连接房主…";
+            var monitorToken = _connection.Token;
+            var lan = _lan;
+            var entrance = _guestEntrance?.LocalEndpoint;
+            _monitor = Task.Run(() => MonitorAsync(process, hosting, lan, entrance, generation, monitorToken));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { await StopAsync("已取消连接"); }
+        catch (Exception ex)
+        {
+            await StopAsync(ex.Message);
+            ShowError(ex);
+        }
+        finally
+        {
+            if (allocated is not null && !ownedByLease)
+            {
+                using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try { await _api.ReleaseP2pRoomAsync(allocated.Id, budget.Token); } catch (Exception) { }
+            }
+        }
+    }
+
+    private static void ValidateRoom(P2pCloudRoom? room)
+    {
+        if (room is null || string.IsNullOrWhiteSpace(room.Id) ||
+            !RelayRoomCode.TryNormalize(room.Code, out _) || room.GamePort is < 1 or > 65535 ||
+            !Uri.TryCreate(room.RendezvousUri, UriKind.Absolute, out var uri) || uri.Scheme is not ("tcp" or "udp") ||
+            uri.Port is < 1 or > 65535 || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
+            uri.Host.Length == 0 || uri.AbsolutePath is not ("" or "/") ||
+            room.NetworkName is not { Length: 32 } || room.NetworkSecret is not { Length: 64 } ||
+            !room.NetworkName.All(char.IsAsciiHexDigit) || !room.NetworkSecret.All(char.IsAsciiHexDigit))
+            throw new InvalidDataException("云端返回的房间信息无效");
+    }
+
+    private async Task MonitorAsync(Process process, bool hosting, P2pLanPublisher? lan,
+        IPEndPoint? entrance, long generation, CancellationToken ct)
+    {
+        string? ended = null;
+        DateTime? peerSeenAt = null;
+        var pathFailed = false;
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (!ReferenceEquals(process, ETController.ETProcess) || process.HasExited)
+                { ended = "连接已结束"; break; }
+                var result = await Task.Run(ETInfoProvider.GetPlayerList, ct);
+                if (ct.IsCancellationRequested) break;
+                if (result.Item1 is not { } peers) continue;
+                var others = P2pReadiness.RoomPeers(peers);
+                var hostReady = hosting ? others.Any(p => p.Cost == ETConnectionType.P2P) : P2pReadiness.CanJoinHost(peers);
+                if (others.Count > 0 && !hostReady)
+                {
+                    peerSeenAt ??= DateTime.UtcNow;
+                    if (DateTime.UtcNow - peerSeenAt > TimeSpan.FromSeconds(45))
+                    { pathFailed = true; ended = "本次房间无法建立 P2P 连接，请重新检测或使用中继联机"; break; }
+                }
+                else peerSeenAt = null;
+                if (lan is not null)
+                {
+                    lan.Enabled = hostReady && await MinecraftServerProbe.ProbeAsync(
+                        entrance!, TimeSpan.FromSeconds(3), ct) is not null;
+                }
+                var text = hosting ? (hostReady ? "玩家已连接" : "房间运行中，等待玩家加入") :
+                    lan?.Enabled == true ? "已连接，请在游戏的多人游戏列表进入" : "正在连接房主…";
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (generation == Interlocked.Read(ref _generation) && _connected && !_stopping && !_working && !_exiting)
+                        LabStatus.Text = text;
+                }));
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { ended = "连接状态读取失败，请重新连接"; }
+        if (ended is not null && !_exiting) Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            if (generation != Interlocked.Read(ref _generation) || _exiting) return;
+            _pathFailed = pathFailed;
+            if (pathFailed) LabNatAdvice.Text = "本次连接不可用，请重新检测网络或更改协议后重试。";
+            await StopAsync(ended);
+        }));
+    }
+
+    private async void BtnStop_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_starting)
+        {
+            _attempt?.Cancel();
+            BtnStop.IsEnabled = false; LabStatus.Text = "正在取消连接…";
+            if (_startup is { } startup) await startup;
             return;
         }
-
-        var result = await Task.Run(ETInfoProvider.GetPlayerList);
-        if (!_busy || !ReferenceEquals(process, ETController.ETProcess)) return;
-        var peers = result.Item1;
-        if (peers is null) return; // 刚启动时 RPC 还没就绪，下一轮再试
-
-        // Cost 为 Local 的那条是自己；能读到自己说明 RPC 已通，网络起来了
-        var selfReady = peers.Any(p => p.Cost == ETConnectionType.Local);
-        var others = P2pReadiness.RoomPeers(peers);
-
-        if (others.Count == 0)
+        await StopAsync(IsHost ? "房间已关闭" : "已退出房间");
+    }
+    private Task StopAsync(string message)
+    {
+        if (_shutdown is { IsCompleted: false }) return _shutdown;
+        _shutdown = StopCoreAsync(message);
+        return _shutdown;
+    }
+    private async Task StopCoreAsync(string message)
+    {
+        _stopping = true; UpdateButtons();
+        Interlocked.Increment(ref _generation);
+        _attempt?.Cancel();
+        _connection?.Cancel();
+        _lan?.Dispose(); _lan = null;
+        if (_process is not null && ReferenceEquals(_process, ETController.ETProcess)) ETController.Exit();
+        _process = null;
+        if (_monitor is not null) try { await _monitor; } catch (Exception) { }
+        _monitor = null;
+        if (_lease is not null)
         {
-            _peerSeenAt = null;
-            PanAddress.Visibility = Visibility.Collapsed;
-            LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Run;
-            LabPeerCount.Text = _isHost ? "还没有人加入" : "正在寻找房主";
-            LabPeerRoute.Text = "—";
-            LabPeerPing.Text = "—";
-            if (selfReady)
-                LabStatus.Text = _isHost ? "本机已启动，等待玩家加入后验证 P2P；尚未确认会合节点或对端连通。"
-                    : "本机已启动，正在寻找房主；尚未确认会合节点或对端连通。";
-            if (DateTime.UtcNow - _connectedAt > TimeSpan.FromSeconds(45))
-                LabStatus.Text += " 请确认双方已启动、房间码一致，以及节点地址和端口可达；未发现对端不能据此判定 NAT 不支持。";
-            return;
+            if (_leaseClosed is not null) _lease.Closed -= _leaseClosed;
+            await _lease.DisposeAsync();
         }
-
-        LabPeerCount.Text = _isHost ? $"发现 {others.Count} 位玩家" : "已发现房间节点";
-
-        // 玩家视角只关心与房主之间这一段；房主视角按所有玩家的最优路径汇总
-        var sample = _isHost ? others : others.Where(p => p.IsHost).ToList();
-        if (sample.Count == 0)
+        _leaseClosed = null;
+        _lease = null; _room = null;
+        if (_hostBridge is not null) await _hostBridge.DisposeAsync(); _hostBridge = null;
+        if (_guestEntrance is not null) await _guestEntrance.DisposeAsync(); _guestEntrance = null;
+        _bridgePort = 0;
+        _connection?.Dispose(); _connection = null;
+        _connected = false;
+        _games = []; ComboGames.ItemsSource = _games; ComboGames.Visibility = Visibility.Collapsed;
+        PanCode.Visibility = Visibility.Collapsed;
+        LabStatus.Text = message;
+        _stopping = false; UpdateButtons();
+    }
+    private void BtnCopyCode_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_room is null) return;
+        try { Clipboard.SetText(_room.Code); LabStatus.Text = "房间码已复制"; }
+        catch (Exception) { LabStatus.Text = "复制失败，请重试"; }
+    }
+    private void OnExit()
+    {
+        Task? leaseCleanup;
+        lock (_launchState)
         {
-            _peerSeenAt = null;
-            PanAddress.Visibility = Visibility.Collapsed;
-            LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Run;
-            LabPeerRoute.Text = "等待房主";
-            LabStatus.Text = "发现其他玩家，但尚未发现房主；请确认房主已启动且房间码一致。";
-            return;
+            if (_exiting) return;
+            _exiting = true; Interlocked.Increment(ref _generation);
+            _operations.Cancel(); _connection?.Cancel(); _lan?.Dispose();
+            if (_hostBridge is not null) _ = _hostBridge.DisposeAsync();
+            if (_guestEntrance is not null) _ = _guestEntrance.DisposeAsync();
+            if (_process is not null && ReferenceEquals(_process, ETController.ETProcess)) ETController.Exit();
+            leaseCleanup = _lease?.DisposeAsync().AsTask();
         }
-
-        var p2pCount = sample.Count(p => p.Cost == ETConnectionType.P2P);
-        var relayCount = sample.Count(p => p.Cost == ETConnectionType.Relay);
-        var hostPathReady = _isHost ? p2pCount > 0 : P2pReadiness.CanJoinHost(peers);
-        if (!hostPathReady)
-        {
-            PanAddress.Visibility = Visibility.Collapsed;
-            LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Run;
-            _peerSeenAt ??= DateTime.UtcNow;
-            LabPeerRoute.Text = "等待 P2P 直连";
-            LabStatus.Text = "已发现对方，正在验证 P2P；游戏数据不会经节点中转。";
-            if (DateTime.UtcNow - _peerSeenAt > TimeSpan.FromSeconds(45))
-                ResetToIdle("当前网络环境未能建立 P2P 直连，无法完成本次组网。请检查双方防火墙或改用中继联机。");
-            return;
-        }
-        _peerSeenAt = null;
-        LabPeerRoute.Text = relayCount > 0 ? "P2P 直连（仍有节点等待直连，不使用中继）" : "P2P 直连";
-
-        var pings = sample.Where(p => p.Cost == ETConnectionType.P2P && p.Ping > 0).Select(p => p.Ping).ToList();
-        LabPeerPing.Text = pings.Count == 0 ? "—" : $"{pings.Min():0} ms";
-        LabRemoteNat.Text = "对端 NAT：" + string.Join("、", sample.Select(p =>
-            string.IsNullOrWhiteSpace(p.NatType) ? "未知" : LobbyTextHandler.GetNatTypeName(p.NatType)));
-
-        PanAddress.Visibility = Visibility.Visible;
-        LoadConnection.State.LoadingState = MyLoading.MyLoadingState.Stop;
-        LabStatus.Text = _isHost
-            ? $"已验证 {p2pCount} 位玩家 P2P 直连；{sample.Count - p2pCount} 位仍在等待直连，不会经节点中转。"
-            : "已连上房主，可以直接进游戏";
-        }
-        finally { _refreshing = false; }
+        // 正常退出由 Lifecycle 触发；先终止进程和监听，再给云端释放留出短暂时间。
+        if (leaseCleanup is not null) try { leaseCleanup.Wait(TimeSpan.FromSeconds(5)); } catch (Exception) { }
+        if (!Dispatcher.CheckAccess() && _startup is { } startup)
+            try { startup.Wait(TimeSpan.FromSeconds(2)); } catch (Exception) { }
     }
 }

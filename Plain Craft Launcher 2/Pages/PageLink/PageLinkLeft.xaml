@@ -8,6 +8,7 @@
     <StackPanel Orientation="Vertical" x:Name="PanItem" Margin="0,12,0,0">
 
         <TextBlock Text="联机方式" Margin="13,5,5,3" Opacity="0.6" FontSize="12" />
+        <TextBlock x:Name="LabUnavailable" Text="联机功能暂不可用" Margin="13,10,10,0" TextWrapping="Wrap" Opacity="0.6" Visibility="Collapsed" />
 
         <local:MyListItem x:Name="ItemP2P"
                           IsScaleAnimationEnabled="False"

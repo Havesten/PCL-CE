@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.IO.Net;
+using PCL.Core.Link.EasyTier;
 
 namespace PCL.Core.Link.Relay;
 
@@ -154,6 +155,32 @@ public sealed class RelayApi
             new { code = normalized }, ct).ConfigureAwait(false)).Room;
     }
 
+    public async Task<IReadOnlyList<P2pRendezvousNode>> GetP2pNodesAsync(CancellationToken ct = default) =>
+        (await SendAsync<P2pNodeList>(HttpMethod.Get, "/api/v1/p2p/nodes", null, ct).ConfigureAwait(false)).Nodes ?? [];
+
+    public async Task<P2pCloudRoom> CreateP2pRoomAsync(string nodeId, string name, string gameVersion, int gamePort,
+        CancellationToken ct = default) =>
+        (await SendAsync<P2pRoomResult>(HttpMethod.Post, "/api/v1/p2p/rooms",
+            new { node_id = nodeId, label = name, game_version = gameVersion, game_port = gamePort }, ct).ConfigureAwait(false)).Room;
+
+    public async Task<P2pCloudRoom> JoinP2pRoomAsync(string code, CancellationToken ct = default)
+    {
+        if (!RelayRoomCode.TryNormalize(code, out var normalized))
+            throw new ArgumentException("请填写完整的五组房间码", nameof(code));
+        return (await SendAsync<P2pRoomResult>(HttpMethod.Post, "/api/v1/p2p/rooms/join",
+            new { code = normalized }, ct).ConfigureAwait(false)).Room;
+    }
+
+    public async Task SetP2pRoomReadyAsync(string id, bool ready, CancellationToken ct = default)
+    {
+        var result = await SendAsync<RelayRoomReadyResult>(HttpMethod.Post, "/api/v1/p2p/rooms/ready",
+            new { id, ready }, ct).ConfigureAwait(false);
+        if (!result.Ok) throw new RelayApiException(HttpStatusCode.ServiceUnavailable, "云端未确认房间状态");
+    }
+
+    public async Task ReleaseP2pRoomAsync(string id, CancellationToken ct = default) =>
+        _ = await SendAsync<RelayRoomReadyResult>(HttpMethod.Post, "/api/v1/p2p/rooms/release", new { id }, ct).ConfigureAwait(false);
+
     // ---------------------------------------------------------------- 传输层
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
@@ -263,6 +290,10 @@ public sealed class RelayApi
         "room_not_found" => "房间码无效或房间已关闭",
         "room_not_ready" => "房间暂时不可用，请确认房主的游戏仍在运行后重试",
         "room_rate_limited" => "房间码查询过于频繁，请一分钟后再试",
+        "p2p_disabled" => "P2P 联机已由管理员关闭",
+        "relay_disabled" => "中继联机已由管理员关闭",
+        "p2p_node_unavailable" => "会合节点暂不可用，请选择其他节点",
+        "p2p_room_exists" => "已有 P2P 房间，请先关闭后再创建",
         "version_too_low" => "版本过低，需要更新",
         // 服务端按来源 IP 判定不在中国大陆时返回；文案由服务端下发，这里只是兜底
         "region_blocked" => "当前可能位于非中国大陆地区，暂时无法使用此功能",

@@ -28,6 +28,7 @@ public partial class RelayPanel : UserControl
     private string? _runningAllocationId;
     private IReadOnlyList<RelayGameServer> _games = [];
     private bool _roomsSupported = true;
+    private bool _relayEnabled = true;
     private bool _exiting;
     private bool _initialized;
     private bool _banned;
@@ -69,6 +70,14 @@ public partial class RelayPanel : UserControl
         }
 
         _timer.Start();
+        if (_host is null && _guest is null)
+        {
+            var stored = RelaySession.Load();
+            _session.Token = stored.Token;
+            _session.Email = stored.Email;
+            _session.ExpiresAt = stored.ExpiresAt;
+            _api.Token = _session.IsValid ? _session.Token : null;
+        }
         try
         {
             if (!_initialized)
@@ -157,6 +166,8 @@ public partial class RelayPanel : UserControl
             var status = await _api.GetStatusAsync(cts.Token).ConfigureAwait(true);
 
             _roomsSupported = status.RoomCodes;
+            _relayEnabled = status.RelayEnabled;
+            if (!_relayEnabled) SetStatus("中继联机已由管理员关闭");
             if (!_roomsSupported) SetStatus("云端需要升级至 3.2.1 才能使用房间码");
             var required = status.RequiredVersion?.Trim();
             _versionTooLow = !string.IsNullOrEmpty(required) && required != Basics.VersionName;
@@ -504,6 +515,7 @@ public partial class RelayPanel : UserControl
     private async Task<bool> CanEnterRoomAsync()
     {
         if (_busy || _exiting) return false;
+        if (!_relayEnabled) { SetStatus("中继联机已由管理员关闭"); return false; }
         if (_regionBlocked)
         {
             SetStatus("当前可能位于非中国大陆地区，暂时无法使用此功能");
@@ -949,7 +961,7 @@ public partial class RelayPanel : UserControl
     /// <summary>封禁、没有节点、版本过低、地区受限、正在忙碌时，分配按钮都不能点。</summary>
     private void UpdateButtons()
     {
-        var available = _session.IsValid && !_busy && !_banned && !_versionTooLow && !_regionBlocked && _roomsSupported &&
+        var available = _session.IsValid && _relayEnabled && !_busy && !_banned && !_versionTooLow && !_regionBlocked && _roomsSupported &&
             _host is null && _guest is null && !_exiting;
         BtnAllocate.IsEnabled = available && _hasNodes;
         BtnScan.IsEnabled = available;

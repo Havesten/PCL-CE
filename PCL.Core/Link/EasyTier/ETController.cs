@@ -205,6 +205,12 @@ public static class ETController
                     break;
             }
 
+            if (holePunching && listenPort <= 0 && Config.Link.IpMode != LinkIpMode.Ipv6Only)
+            {
+                arguments.Add("l", "tcp://0.0.0.0:0");
+                arguments.Add("l", "udp://0.0.0.0:0");
+            }
+
             // 纯直连需要双方事先约定端口：对方要连的就是这个端口，不能随机
             if (listenPort > 0)
             {
