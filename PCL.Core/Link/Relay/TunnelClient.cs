@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,6 +45,7 @@ public sealed class TunnelClient : IDisposable
 
     private readonly RelayTunnel _tunnel;
     private readonly int _localPort;
+    private readonly string _localAddress;
     private readonly string _label;
     private readonly TimeSpan _pingInterval;
 
@@ -67,9 +69,20 @@ public sealed class TunnelClient : IDisposable
     }
 
     internal TunnelClient(RelayTunnel tunnel, int localPort, string label, TimeSpan pingInterval)
+        : this(tunnel, new IPEndPoint(IPAddress.Loopback, localPort), label, pingInterval)
+    {
+    }
+
+    public TunnelClient(RelayTunnel tunnel, IPEndPoint gameEndpoint, string label)
+        : this(tunnel, gameEndpoint, label, PingInterval)
+    {
+    }
+
+    private TunnelClient(RelayTunnel tunnel, IPEndPoint gameEndpoint, string label, TimeSpan pingInterval)
     {
         _tunnel = tunnel;
-        _localPort = localPort;
+        _localPort = gameEndpoint.Port;
+        _localAddress = gameEndpoint.Address.ToString();
         _label = string.IsNullOrWhiteSpace(label) ? "pcl-relay" : label;
         _pingInterval = pingInterval;
     }
@@ -339,7 +352,7 @@ public sealed class TunnelClient : IDisposable
 
             // 连接本地游戏服
             gameConn = new TcpClient { NoDelay = true };
-            await gameConn.ConnectAsync("127.0.0.1", _localPort, connectToken).ConfigureAwait(false);
+            await gameConn.ConnectAsync(_localAddress, _localPort, connectToken).ConfigureAwait(false);
             var gameStream = gameConn.GetStream();
             connectCts.CancelAfter(Timeout.InfiniteTimeSpan);
 

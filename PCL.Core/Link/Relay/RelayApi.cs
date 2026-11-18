@@ -32,7 +32,13 @@ public sealed class RelayApi
 
     // 用专用的短超时客户端（12 秒），而不是全局默认客户端的 100 秒：
     // 联机页在切换时就会发几个请求，超时太长会让整页像「卡死」。
-    private readonly HttpClient _client = NetworkService.GetClient(NetworkService.Relay);
+    private readonly HttpClient _client;
+    private readonly string? _clientVersion;
+
+    public RelayApi(HttpClient? client = null) =>
+        _client = client ?? NetworkService.GetClient(NetworkService.Relay);
+
+    internal RelayApi(HttpClient client, string clientVersion) : this(client) => _clientVersion = clientVersion;
 
     /// <summary>
     ///     登录后由 <see cref="RelaySession" /> 注入，所有需鉴权的接口都要带上。
@@ -120,6 +126,34 @@ public sealed class RelayApi
             $"/api/v1/relay/allocations/release?id={Uri.EscapeDataString(allocationId)}", null, ct)
             .ConfigureAwait(false);
 
+    public async Task<RelayAllocationResult> CreateRoomAsync(string nodeId, string name, string gameVersion,
+        CancellationToken ct = default) =>
+        await SendAsync<RelayAllocationResult>(HttpMethod.Post, "/api/v1/relay/allocations", new
+        {
+            node_id = nodeId,
+            label = name,
+            room = true,
+            game_version = gameVersion
+        }, ct).ConfigureAwait(false);
+
+    public async Task SetRoomReadyAsync(string allocationId, bool ready, CancellationToken ct = default)
+    {
+        var result = await SendAsync<RelayRoomReadyResult>(HttpMethod.Post, "/api/v1/relay/rooms/ready", new
+        {
+            id = allocationId,
+            ready
+        }, ct).ConfigureAwait(false);
+        if (!result.Ok) throw new RelayApiException(HttpStatusCode.ServiceUnavailable, "云端未确认房间状态，请稍后重试");
+    }
+
+    public async Task<RelayRoom> JoinRoomAsync(string code, CancellationToken ct = default)
+    {
+        if (!RelayRoomCode.TryNormalize(code, out var normalized))
+            throw new ArgumentException("房间码格式不正确，请粘贴完整的五组房间码", nameof(code));
+        return (await SendAsync<RelayRoomResult>(HttpMethod.Post, "/api/v1/relay/rooms/join",
+            new { code = normalized }, ct).ConfigureAwait(false)).Room;
+    }
+
     // ---------------------------------------------------------------- 传输层
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
@@ -127,7 +161,7 @@ public sealed class RelayApi
         using var request = new HttpRequestMessage(method, BaseUrl.TrimEnd('/') + path);
         if (body is not null) request.Content = JsonContent.Create(body);
         // 联机功能版本门槛：带上启动器版本号，服务端要求版本不一致时会拒绝分配端口。
-        request.Headers.TryAddWithoutValidation("X-Client-Version", Basics.VersionName);
+        request.Headers.TryAddWithoutValidation("X-Client-Version", _clientVersion ?? Basics.VersionName);
         if (!string.IsNullOrWhiteSpace(Token))
             request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Token);
 
@@ -222,7 +256,13 @@ public sealed class RelayApi
         "traffic_exhausted" => "本月流量已用完",
         "port_quota_exhausted" => "端口配额已用完，请先释放已有端口",
         "node_offline" => "该节点已离线，请换一个",
+        "node_upgrade_required" => "该节点需要升级至 3.2.1 才能创建房间码，请选择其他节点或联系管理员",
         "no_port_available" => "该节点端口已分配完，请换一个",
+        "room_code_invalid" => "房间码格式不正确，请粘贴完整的五组房间码",
+        "room_code_unavailable" => "房间码暂时生成失败，请稍后重试",
+        "room_not_found" => "房间码无效或房间已关闭",
+        "room_not_ready" => "房间暂时不可用，请确认房主的游戏仍在运行后重试",
+        "room_rate_limited" => "房间码查询过于频繁，请一分钟后再试",
         "version_too_low" => "版本过低，需要更新",
         // 服务端按来源 IP 判定不在中国大陆时返回；文案由服务端下发，这里只是兜底
         "region_blocked" => "当前可能位于非中国大陆地区，暂时无法使用此功能",

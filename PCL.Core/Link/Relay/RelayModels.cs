@@ -60,7 +60,8 @@ public sealed record RelayNode(
     [property: JsonPropertyName("host")] string Host,
     [property: JsonPropertyName("region")] string Region,
     [property: JsonPropertyName("load")] int Load,
-    [property: JsonPropertyName("capacity")] int Capacity)
+    [property: JsonPropertyName("capacity")] int Capacity,
+    [property: JsonPropertyName("room_codes")] bool RoomCodes = false)
 {
     public override string ToString() =>
         string.IsNullOrWhiteSpace(Region)
@@ -78,13 +79,24 @@ public sealed record RelayAllocation(
     [property: JsonPropertyName("internal_port")] int InternalPort,
     [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt,
     [property: JsonPropertyName("bytes_in")] long BytesIn,
-    [property: JsonPropertyName("bytes_out")] long BytesOut)
-{
-    /// <summary>
-    ///     分享给朋友的地址。中继模式下房主不需要公网 IP。
-    /// </summary>
-    public string GameAddress => $"{PublicHost}:{PublicPort}";
-}
+    [property: JsonPropertyName("bytes_out")] long BytesOut,
+    [property: JsonPropertyName("room_code")] string? RoomCode = null,
+    [property: JsonPropertyName("game_version")] string? GameVersion = null,
+    [property: JsonPropertyName("room_ready")] bool RoomReady = false);
+
+public sealed record RelayRoom(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("game_version")] string GameVersion,
+    [property: JsonPropertyName("node_name")] string NodeName,
+    [property: JsonPropertyName("server_host")] string ServerHost,
+    [property: JsonPropertyName("server_port")] int ServerPort,
+    [property: JsonPropertyName("join_token")] string JoinToken,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt);
+
+internal sealed record RelayRoomResult([property: JsonPropertyName("room")] RelayRoom Room);
+internal sealed record RelayRoomReadyResult([property: JsonPropertyName("ok")] bool Ok);
 
 /// <summary>
 ///     自研隧道（PTP v1）连接参数。服务端分配时下发，客户端据此建立隧道。
@@ -127,7 +139,9 @@ public sealed record RelayStatus(
     // 两个字段都缺省为「不限制」，老服务端不会把客户端拦下来。
     [property: JsonPropertyName("region_check")] bool RegionCheck = false,
     [property: JsonPropertyName("region_allowed")] bool RegionAllowed = true,
-    [property: JsonPropertyName("region")] string? Region = null);
+    [property: JsonPropertyName("region")] string? Region = null,
+    [property: JsonPropertyName("room_codes")] bool RoomCodes = false,
+    [property: JsonPropertyName("room_code_prefix")] string? RoomCodePrefix = null);
 
 internal sealed record RelayErrorBody(
     [property: JsonPropertyName("error")] string? Error,

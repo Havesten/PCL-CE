@@ -21,9 +21,14 @@ public partial class RelayPanel : UserControl
     private readonly RelaySession _session = RelaySession.Load();
     private readonly RelayApi _api;
     private readonly DispatcherTimer _timer;
+    private readonly CancellationTokenSource _lifetime = new();
     private RelayCaptcha? _captcha;
-    private TunnelClient? _runner;
+    private RelayRoomHost? _host;
+    private RelayRoomClient? _guest;
     private string? _runningAllocationId;
+    private IReadOnlyList<RelayGameServer> _games = [];
+    private bool _roomsSupported = true;
+    private bool _exiting;
     private bool _initialized;
     private bool _banned;
     private bool _hasNodes;
@@ -151,6 +156,8 @@ public partial class RelayPanel : UserControl
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             var status = await _api.GetStatusAsync(cts.Token).ConfigureAwait(true);
 
+            _roomsSupported = status.RoomCodes;
+            if (!_roomsSupported) SetStatus("云端需要升级至 3.2.1 才能使用房间码");
             var required = status.RequiredVersion?.Trim();
             _versionTooLow = !string.IsNullOrEmpty(required) && required != Basics.VersionName;
             if (_versionTooLow) SetStatus("版本过低，需要更新");
@@ -294,14 +301,27 @@ public partial class RelayPanel : UserControl
 
     private async void BtnLogout_Click(object sender, MouseButtonEventArgs e)
     {
-        _session.Clear();
-        _api.Token = null;
-        ListPorts.ItemsSource = null;
-        LabEmpty.Visibility = Visibility.Visible;
-        ShowLogin();
-        // 退出后人机验证仍是上一次登录用掉的那道，得重新取一道才能发码。
-        await RefreshCaptchaAsync().ConfigureAwait(true);
-        SetStatus("已退出登录");
+        if (_busy) return;
+        SetBusy(true, "正在退出登录…");
+        var id = StopLocalRoom();
+        var released = true;
+        try
+        {
+            if (id is not null) await _api.ReleaseAsync(id, _lifetime.Token).ConfigureAwait(true);
+        }
+        catch (Exception) { released = false; }
+        try
+        {
+            _session.Clear();
+            _api.Token = null;
+            ListRooms.ItemsSource = null;
+            LabEmpty.Text = "还没有创建的房间";
+            LabEmpty.Visibility = Visibility.Visible;
+            ShowLogin();
+            await RefreshCaptchaAsync().ConfigureAwait(true);
+            SetStatus(released ? "已退出登录" : "已退出登录，房间已停止，云端释放暂时失败");
+        }
+        finally { SetBusy(false); }
     }
 
     // ---------------------------------------------------------------- 手机号绑定
@@ -347,7 +367,7 @@ public partial class RelayPanel : UserControl
             }
             else
             {
-                SetStatus("尚未绑定手机号，绑定后才能分配端口");
+                SetStatus("尚未绑定手机号，绑定后才能创建或加入房间");
             }
         }
         catch (Exception ex)
@@ -377,14 +397,19 @@ public partial class RelayPanel : UserControl
 
     private async Task RefreshCoreAsync()
     {
+        var token = _api.Token;
         try
         {
             // 账号信息与节点列表互不依赖，并行发出去：串行时网络慢就等于把两倍延迟叠起来，
             // 用户看到的是「切到联机页后一直没反应」。
-            var meTask = _api.GetMeAsync();
-            var nodesTask = _api.GetNodesAsync();
+            var meTask = _api.GetMeAsync(_lifetime.Token);
+            var nodesTask = _api.GetNodesAsync(_lifetime.Token);
+            // 无论哪一个失败，都观察两个任务，避免节点异常成为未处理任务。
+            try { await Task.WhenAll(meTask, nodesTask).ConfigureAwait(true); }
+            catch (Exception) { }
 
             var me = await meTask.ConfigureAwait(true);
+            if (_exiting || _api.Token != token) return;
             _lastMe = me;
             ApplyMe(me);
             ApplyQuota(me.Quota);
@@ -405,14 +430,18 @@ public partial class RelayPanel : UserControl
         }
         catch (RelayApiException ex) when (ex.Status == System.Net.HttpStatusCode.Unauthorized)
         {
+            if (_exiting || _api.Token != token) return;
+            StopLocalRoom();
             _session.Clear();
             _api.Token = null;
+            ListRooms.ItemsSource = null;
             ShowLogin(true);
             await RefreshCaptchaAsync().ConfigureAwait(true);
             SetStatus("登录已过期，请重新登录");
         }
         catch (Exception ex)
         {
+            if (_exiting || _api.Token != token) return;
             SetStatus("刷新失败：" + ex.Message);
         }
     }
@@ -422,7 +451,11 @@ public partial class RelayPanel : UserControl
     {
         _banned = me.IsBanned;
         SetAuthState(_banned ? AuthState.Banned : AuthState.LoggedIn, me);
-        if (_banned) SetStatus("账号已被封禁");
+        if (_banned)
+        {
+            StopLocalRoom();
+            SetStatus("账号已被封禁");
+        }
         // 未绑定手机号且服务端强制绑定时，账号卡上给一个手动入口
         BtnBindPhone.Visibility = me.PhoneRequired ? Visibility.Visible : Visibility.Collapsed;
         UpdateButtons();
@@ -431,21 +464,23 @@ public partial class RelayPanel : UserControl
     private void ApplyNodes(IReadOnlyList<RelayNode> nodes)
     {
         var selected = (ComboNodes.SelectedItem as RelayNode)?.Id;
-        if (nodes.Count == 0)
+        var compatible = nodes.Where(node => node.RoomCodes).ToArray();
+        if (compatible.Length == 0)
         {
-            ComboNodes.ItemsSource = new[] { new RelayNode("", "暂无可用节点", "", "", 0, 0) };
+            ComboNodes.ItemsSource = new[] { new RelayNode("", nodes.Count > 0 ? "节点需要升级至 3.2.1" : "暂无可用节点", "", "", 0, 0) };
             ComboNodes.SelectedIndex = 0;
             _hasNodes = false;
-            LabEmpty.Text = "服务端还没有可用的中继节点";
+            LabEmpty.Text = !_roomsSupported ? "请先将云端升级至 3.2.1" :
+                nodes.Count > 0 ? "请先将中继节点升级至 3.2.1" : "服务端还没有可用的中继节点";
             LabEmpty.Visibility = Visibility.Visible;
             UpdateButtons();
             return;
         }
 
         _hasNodes = true;
-        ComboNodes.ItemsSource = nodes;
-        ComboNodes.SelectedItem = nodes.FirstOrDefault(n => n.Id == selected) ?? nodes[0];
-        if (ListPorts.ItemsSource is null) LabEmpty.Text = "还没有分配的端口";
+        ComboNodes.ItemsSource = compatible;
+        ComboNodes.SelectedItem = compatible.FirstOrDefault(n => n.Id == selected) ?? compatible[0];
+        LabEmpty.Text = "还没有创建的房间";
         UpdateButtons();
     }
 
@@ -459,102 +494,142 @@ public partial class RelayPanel : UserControl
 
     private void ApplyAllocations(IReadOnlyList<RelayAllocation> list)
     {
-        var items = list.Select(a => new PortItem(a)).ToList();
-        ListPorts.ItemsSource = items;
+        var items = list.Select(a => new RoomItem(a)).ToList();
+        ListRooms.ItemsSource = items;
         LabEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // ---------------------------------------------------------------- 端口
+    // ---------------------------------------------------------------- 房间
 
-    private async void BtnAllocate_Click(object sender, MouseButtonEventArgs e)
+    private async Task<bool> CanEnterRoomAsync()
     {
+        if (_busy || _exiting) return false;
         if (_regionBlocked)
         {
             SetStatus("当前可能位于非中国大陆地区，暂时无法使用此功能");
-            return;
+            return false;
         }
         if (_versionTooLow)
         {
             SetStatus("版本过低，需要更新");
-            return;
+            return false;
         }
         if (!_session.IsValid)
         {
             SetStatus("请先登录");
-            return;
+            return false;
         }
-
         if (_banned)
         {
-            SetStatus("账号已被封禁，无法分配中继端口");
-            return;
+            SetStatus("账号已被封禁，无法创建或加入房间");
+            return false;
         }
-
-        // 强制绑定手机号：未绑定时先弹窗，绑定成功后再让用户重新点分配
+        if (!_roomsSupported)
+        {
+            SetStatus("云端需要升级至 3.2.1 才能使用房间码");
+            return false;
+        }
+        if (_host is not null || _guest is not null)
+        {
+            SetStatus("请先关闭或退出当前房间");
+            return false;
+        }
         if (_lastMe is { PhoneRequired: true })
         {
             _phonePrompted = false;
             await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
-            return;
+            return false;
         }
+        return true;
+    }
 
-        if (ComboNodes.SelectedItem is not RelayNode node || string.IsNullOrEmpty(node.Id))
+    private async Task ScanGamesAsync()
+    {
+        _games = await RelayGameDiscovery.ScanAsync(_lifetime.Token).ConfigureAwait(true);
+        ComboGames.ItemsSource = _games;
+        ComboGames.Visibility = _games.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ComboGames.SelectedIndex = _games.Count == 1 ? 0 : -1;
+        LabScanHint.Text = _games.Count switch
+        {
+            0 => "未发现可用游戏。请先进入世界，在暂停菜单中选择“对局域网开放”，然后重新扫描。",
+            1 => "已验证游戏：" + _games[0],
+            _ => $"发现 {_games.Count} 个已验证的游戏，请选择要分享的游戏后点击创建房间。"
+        };
+    }
+
+    private async void BtnScan_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!await CanEnterRoomAsync().ConfigureAwait(true)) return;
+        try
+        {
+            SetBusy(true, "正在扫描并验证本机游戏…");
+            await ScanGamesAsync().ConfigureAwait(true);
+            SetStatus(_games.Count > 0 ? "游戏扫描完成" : "未发现已开放的游戏房间");
+        }
+        catch (OperationCanceledException) when (_exiting) { }
+        catch (Exception ex) { SetStatus("扫描失败：" + ex.Message); }
+        finally { SetBusy(false); }
+    }
+
+    private async void BtnAllocate_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!await CanEnterRoomAsync().ConfigureAwait(true)) return;
+        if (ComboNodes.SelectedItem is not RelayNode { RoomCodes: true } node || string.IsNullOrEmpty(node.Id))
         {
             SetStatus("请选择节点");
             return;
         }
 
-        if (!int.TryParse(TextLocalPort.Text.Trim(), out var localPort) || localPort is < 1 or > 65535)
-        {
-            SetStatus("本地端口不合法");
-            return;
-        }
-
-        if (_runner is not null)
-        {
-            SetStatus("已有隧道在运行，请先停止");
-            return;
-        }
-
+        RelayAllocationResult? result = null;
+        RelayRoomHost? host = null;
         try
         {
-            SetBusy(true, "正在分配端口…");
-            var result = await _api.AllocateAsync(node.Id, "PCL 联机").ConfigureAwait(true);
-            _runningAllocationId = result.Allocation.Id;
-
-            var runner = new TunnelClient(result.Tunnel, localPort, "pcl-" + result.Allocation.Id);
-            var error = await runner.StartAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(true);
-            if (error is not null)
+            SetBusy(true, "正在扫描并验证本机游戏…");
+            if (_games.Count == 0) await ScanGamesAsync().ConfigureAwait(true);
+            if (ComboGames.SelectedItem is not RelayGameServer game)
             {
-                runner.Dispose();
-                await _api.ReleaseAsync(result.Allocation.Id).ConfigureAwait(true);
-                _runningAllocationId = null;
-                SetStatus(error);
+                SetStatus(_games.Count == 0 ? "未发现游戏，请先在游戏中打开局域网" : "请选择要分享的游戏");
                 return;
             }
-
-            _runner = runner;
+            var verified = await MinecraftServerProbe.ProbeAsync(game.Endpoint, TimeSpan.FromSeconds(3), _lifetime.Token)
+                .ConfigureAwait(true);
+            if (verified is null)
+            {
+                _games = [];
+                ComboGames.ItemsSource = null;
+                ComboGames.Visibility = Visibility.Collapsed;
+                LabScanHint.Text = "游戏房间已关闭，请重新打开局域网后扫描。";
+                SetStatus("游戏验证失败，请重新扫描");
+                return;
+            }
+            SetStatus("正在向云端申请房间码…");
+            result = await _api.CreateRoomAsync(node.Id, game.Name, verified.Version, _lifetime.Token).ConfigureAwait(true);
+            _runningAllocationId = result.Allocation.Id;
+            host = new RelayRoomHost(_api, result, game);
+            _host = host;
+            AttachHostEvents(host);
+            SetStatus("正在建立房间连接…");
+            await host.StartAsync(_lifetime.Token).ConfigureAwait(true);
+            if (_host != host || _exiting) return;
+            BtnStop.Text = "关闭房间";
             BtnStop.Visibility = Visibility.Visible;
-            SetStatus($"隧道已建立：{result.Allocation.GameAddress}（本地 {localPort}）");
             ApplyQuota(result.Quota);
+            ApplyAllocations((_lastMe?.Allocations ?? []).Where(a => a.Id != result.Allocation.Id)
+                .Append(result.Allocation with { RoomReady = true }).ToArray());
             await RefreshAsync().ConfigureAwait(true);
-        }
-        catch (RelayApiException ex) when (IsRegionBlocked(ex))
-        {
-            // 页面打开后换了网络（例如切到境外线路）时，服务端会在这里拦下来。
-            // 此时把界面切到受限态，避免用户反复点「分配并启动」。
-            _regionBlocked = true;
-            ApplyRegionState();
+            if (_host != host || _exiting) return;
+            SetStatus("房间已创建：" + result.Allocation.RoomCode + "，复制房间码分享给朋友即可");
         }
         catch (Exception ex)
         {
-            SetStatus(ex.Message);
-            await RefreshAsync().ConfigureAwait(true);
-            if (_lastMe is { PhoneRequired: true })
+            host?.Dispose();
+            if (_host == host) StopLocalRoom();
+            if (result is not null && !_exiting)
             {
-                _phonePrompted = false;
-                await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
+                try { await _api.ReleaseAsync(result.Allocation.Id, _lifetime.Token).ConfigureAwait(true); }
+                catch (Exception) { }
             }
+            if (!_exiting) await HandleRoomErrorAsync(ex).ConfigureAwait(true);
         }
         finally
         {
@@ -564,14 +639,14 @@ public partial class RelayPanel : UserControl
 
     private async void BtnRelease_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { Tag: PortItem item }) return;
+        if (_busy || sender is not FrameworkElement { Tag: RoomItem item }) return;
 
         try
         {
-            SetBusy(true, "正在释放…");
-            if (_runningAllocationId == item.Allocation.Id) StopTunnel();
-            await _api.ReleaseAsync(item.Allocation.Id).ConfigureAwait(true);
-            SetStatus("已释放 " + item.Allocation.GameAddress);
+            SetBusy(true, "正在关闭房间…");
+            if (_runningAllocationId == item.Allocation.Id) StopLocalRoom();
+            await _api.ReleaseAsync(item.Allocation.Id, _lifetime.Token).ConfigureAwait(true);
+            SetStatus("房间已关闭，房间码已失效");
             await RefreshAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
@@ -586,58 +661,146 @@ public partial class RelayPanel : UserControl
 
     private void BtnCopy_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { Tag: PortItem item }) return;
+        if (sender is not FrameworkElement { Tag: RoomItem { CanCopy: true } item }) return;
         try
         {
-            Clipboard.SetText(item.Allocation.GameAddress);
-            SetStatus("已复制：" + item.Allocation.GameAddress);
+            Clipboard.SetText(item.RoomCode);
+            SetStatus("已复制房间码：" + item.RoomCode);
         }
         catch (Exception)
         {
-            SetStatus("复制失败，请手动选中地址");
+            SetStatus("房间码复制失败，请稍后重试");
         }
     }
 
-    private async void BtnStop_Click(object sender, MouseButtonEventArgs e) => await StopAndReleaseAsync().ConfigureAwait(true);
+    private async void BtnJoin_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!await CanEnterRoomAsync().ConfigureAwait(true)) return;
+        if (!RelayRoomCode.TryNormalize(TextRoomCode.Text, out var code))
+        {
+            SetStatus("房间码格式不正确，请粘贴完整的五组房间码");
+            return;
+        }
+        RelayRoomClient? guest = null;
+        try
+        {
+            SetBusy(true, "正在查询房间码…");
+            TextRoomCode.Text = code;
+            var room = await _api.JoinRoomAsync(code, _lifetime.Token).ConfigureAwait(true);
+            guest = new RelayRoomClient(_api, room);
+            _guest = guest;
+            AttachGuestEvents(guest);
+            SetStatus("正在验证房间连接…");
+            await guest.StartAsync(_lifetime.Token).ConfigureAwait(true);
+            if (_guest != guest || _exiting) return;
+            LabJoinedName.Text = room.Name + " · " + room.GameVersion + " · " + room.NodeName;
+            LabJoinedCode.Text = room.Code;
+            PanJoinedRoom.Visibility = Visibility.Visible;
+            BtnStop.Text = "退出房间";
+            BtnStop.Visibility = Visibility.Visible;
+            SetStatus("已加入房间，打开游戏的多人游戏列表即可进入");
+        }
+        catch (Exception ex)
+        {
+            guest?.Dispose();
+            if (_guest == guest) StopLocalRoom();
+            if (!_exiting) await HandleRoomErrorAsync(ex).ConfigureAwait(true);
+        }
+        finally { SetBusy(false); }
+    }
 
-    /// <summary>
-    ///     停止按钮 = 停隧道 + 自动释放端口（不留存量分配，下次分配随机给新端口）。
-    ///     释放失败只报状态栏，不回滚「已停止」这个事实。
-    /// </summary>
+    private void AttachHostEvents(RelayRoomHost host)
+    {
+        host.StatusChanged += text => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_exiting && _host == host && !_busy) SetStatus(text);
+        }));
+        host.Closed += reason => Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            if (_exiting || _host != host) return;
+            StopLocalRoom();
+            await RefreshAsync().ConfigureAwait(true);
+            SetStatus(reason);
+        }));
+    }
+
+    private void AttachGuestEvents(RelayRoomClient guest)
+    {
+        guest.StatusChanged += text => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_exiting && _guest == guest && !_busy) SetStatus(text);
+        }));
+        guest.Closed += reason => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_exiting || _guest != guest) return;
+            StopLocalRoom();
+            SetStatus(reason);
+        }));
+    }
+
+    private async Task HandleRoomErrorAsync(Exception error)
+    {
+        if (error is RelayApiException apiError && IsRegionBlocked(apiError))
+        {
+            _regionBlocked = true;
+            ApplyRegionState();
+        }
+        else
+        {
+            await RefreshAsync().ConfigureAwait(true);
+            SetStatus(error.Message);
+            if (_lastMe is { PhoneRequired: true })
+            {
+                _phonePrompted = false;
+                await PromptBindPhoneIfNeededAsync().ConfigureAwait(true);
+            }
+        }
+    }
+
+    private async void BtnStop_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_busy) return;
+        await StopAndReleaseAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>房主关闭时释放云端分配；访客退出只关闭本机入口。</summary>
     private async Task StopAndReleaseAsync()
     {
-        var id = _runningAllocationId;
-        StopTunnel();
+        var id = StopLocalRoom();
         if (id is null)
         {
-            SetStatus("隧道已停止");
+            SetStatus("已退出房间");
             return;
         }
 
         try
         {
-            SetBusy(true, "正在停止并释放端口…");
-            await _api.ReleaseAsync(id).ConfigureAwait(true);
-            SetStatus("隧道已停止，端口已自动释放");
+            SetBusy(true, "正在关闭房间…");
+            await _api.ReleaseAsync(id, _lifetime.Token).ConfigureAwait(true);
+            await RefreshAsync().ConfigureAwait(true);
+            SetStatus("房间已关闭，房间码已失效");
         }
         catch (Exception ex)
         {
-            SetStatus("隧道已停止，但端口释放失败：" + ex.Message);
+            SetStatus("房间已停止，云端释放失败：" + ex.Message);
         }
         finally
         {
             SetBusy(false);
         }
-
-        await RefreshAsync().ConfigureAwait(true);
     }
 
     /// <summary>退出也视为停止：尽力释放占用的端口，失败留给服务端 TTL 兜底，不拦退出。</summary>
     private void OnAppExit()
     {
+        _exiting = true;
+        _timer.Stop();
+        _lifetime.Cancel();
         var id = _runningAllocationId;
-        _runner?.Dispose();
-        _runner = null;
+        _host?.Dispose();
+        _guest?.Dispose();
+        _host = null;
+        _guest = null;
         if (id is not null && _session.IsValid)
         {
             try
@@ -651,13 +814,18 @@ public partial class RelayPanel : UserControl
         }
     }
 
-    private void StopTunnel()
+    private string? StopLocalRoom()
     {
-        _runner?.Dispose();
-        _runner = null;
+        var id = _runningAllocationId;
+        _host?.Dispose();
+        _guest?.Dispose();
+        _host = null;
+        _guest = null;
         _runningAllocationId = null;
         BtnStop.Visibility = Visibility.Collapsed;
-        SetStatus("隧道已停止");
+        PanJoinedRoom.Visibility = Visibility.Collapsed;
+        UpdateButtons();
+        return id;
     }
 
     // ---------------------------------------------------------------- 界面状态
@@ -694,21 +862,21 @@ public partial class RelayPanel : UserControl
             case AuthState.LoggedOut:
                 DotAuth.Fill = AuthDotIdle;
                 LabAccount.Text = "未登录";
-                LabAccountSub.Text = "登录后即可分配中继端口";
+                LabAccountSub.Text = "登录后即可创建或加入房间";
                 break;
 
             case AuthState.Expired:
                 DotAuth.Fill = AuthDotWarn;
                 LabAccount.Text = "登录已过期";
-                LabAccountSub.Text = "会话令牌已失效，请重新登录后再分配端口";
+                LabAccountSub.Text = "会话令牌已失效，请重新登录后使用房间";
                 break;
 
             case AuthState.Banned:
                 DotAuth.Fill = AuthDotBad;
                 LabAccount.Text = "账号已封禁";
                 LabAccountSub.Text = string.IsNullOrWhiteSpace(email)
-                    ? "无法分配中继端口，请联系管理员"
-                    : $"{email} · 无法分配中继端口，请联系管理员";
+                    ? "无法创建或加入房间，请联系管理员"
+                    : $"{email} · 无法创建或加入房间，请联系管理员";
                 break;
 
             default:
@@ -725,7 +893,7 @@ public partial class RelayPanel : UserControl
                 if (me?.Quota.CustomQuota == true) parts.Add("单独配额");
                 if (_session.ExpiresAt != default)
                     parts.Add("会话有效期至 " + _session.ExpiresAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm"));
-                LabAccountSub.Text = parts.Count == 0 ? "可以分配中继端口" : string.Join(" · ", parts);
+                LabAccountSub.Text = parts.Count == 0 ? "可以创建或加入房间" : string.Join(" · ", parts);
                 break;
         }
     }
@@ -741,6 +909,9 @@ public partial class RelayPanel : UserControl
         _banned = false;
         _lastMe = null;
         _phonePrompted = false;
+        ListRooms.ItemsSource = null;
+        LabEmpty.Text = "登录后即可创建或加入房间";
+        LabEmpty.Visibility = Visibility.Visible;
         UpdateButtons();
     }
 
@@ -766,8 +937,8 @@ public partial class RelayPanel : UserControl
         PanQuota.Visibility = Visibility.Collapsed;
         BtnLogout.Visibility = Visibility.Collapsed;
         BtnBindPhone.Visibility = Visibility.Collapsed;
-        BtnStop.Visibility = _runner is null ? Visibility.Collapsed : Visibility.Visible;
-        ListPorts.ItemsSource = null;
+        BtnStop.Visibility = _host is null && _guest is null ? Visibility.Collapsed : Visibility.Visible;
+        ListRooms.ItemsSource = null;
         LabEmpty.Visibility = Visibility.Collapsed;
         PanRegionBlocked.Visibility = Visibility.Visible;
         _lastMe = null;
@@ -778,8 +949,15 @@ public partial class RelayPanel : UserControl
     /// <summary>封禁、没有节点、版本过低、地区受限、正在忙碌时，分配按钮都不能点。</summary>
     private void UpdateButtons()
     {
-        BtnAllocate.IsEnabled = !_busy && !_banned && _hasNodes && !_versionTooLow && !_regionBlocked;
-        ComboNodes.IsEnabled = !_banned && _hasNodes && !_regionBlocked;
+        var available = _session.IsValid && !_busy && !_banned && !_versionTooLow && !_regionBlocked && _roomsSupported &&
+            _host is null && _guest is null && !_exiting;
+        BtnAllocate.IsEnabled = available && _hasNodes;
+        BtnScan.IsEnabled = available;
+        BtnJoin.IsEnabled = available;
+        ComboNodes.IsEnabled = available && _hasNodes;
+        ComboGames.IsEnabled = available;
+        TextRoomCode.IsEnabled = available;
+        BtnStop.IsEnabled = !_busy;
         BtnLogout.IsEnabled = !_busy;
         // 地区受限时连登录都禁用，避免用户以为登录之后就能用
         BtnRefreshCaptcha.IsEnabled = !_busy && !_regionBlocked;
@@ -823,18 +1001,21 @@ public partial class RelayPanel : UserControl
         ex.Status == System.Net.HttpStatusCode.Forbidden &&
         (ex.Body?.Contains("region_blocked", StringComparison.Ordinal) ?? false);
 
-    /// <summary>列表项包装：直接绑 RelayAllocation 的话 UsageText 没地方放。</summary>
-    public sealed class PortItem
+    /// <summary>只展示房间码与游戏信息，连接地址由联机组件内部使用。</summary>
+    public sealed class RoomItem
     {
-        public PortItem(RelayAllocation allocation)
+        public RoomItem(RelayAllocation allocation)
         {
             Allocation = allocation;
         }
 
         public RelayAllocation Allocation { get; }
-        public string GameAddress => Allocation.GameAddress;
+        public bool CanCopy => RelayRoomCode.TryNormalize(Allocation.RoomCode, out _);
+        public string RoomCode => CanCopy ? Allocation.RoomCode! : "旧版房间（请关闭后重新创建）";
         public string NodeName => Allocation.NodeName;
-        public string Label => Allocation.Label;
+        public string Label => string.IsNullOrWhiteSpace(Allocation.GameVersion)
+            ? Allocation.Label : Allocation.Label + " · " + Allocation.GameVersion;
+        public string StateText => Allocation.RoomReady ? "运行中" : "等待游戏连接";
         public string UsageText => FormatSize(Allocation.BytesIn + Allocation.BytesOut);
     }
 }

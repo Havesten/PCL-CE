@@ -5,9 +5,9 @@
              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
     <StackPanel Margin="10,0,10,10">
 
-        <!-- 顶部：状态 + 强制停隧道 -->
+        <!-- 顶部：房间状态 -->
         <DockPanel Margin="0,4,0,10">
-            <local:MyButton x:Name="BtnStop" DockPanel.Dock="Right" Text="停止隧道"
+            <local:MyButton x:Name="BtnStop" DockPanel.Dock="Right" Text="关闭房间"
                             ColorType="Normal" Width="96" Visibility="Collapsed" Click="BtnStop_Click" />
             <TextBlock x:Name="LabStatus" Text="就绪" Opacity="0.7" Margin="0,0,12,0"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -41,7 +41,7 @@
                             <TextBlock x:Name="LabAccount" Text="未登录" FontSize="15" FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock x:Name="LabAccountSub" Text="登录后即可分配中继端口" Opacity="0.7"
+                        <TextBlock x:Name="LabAccountSub" Text="登录后即可创建或加入房间" Opacity="0.7"
                                    Margin="16,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>
                 </DockPanel>
@@ -107,7 +107,7 @@
                         <TextBlock x:Name="LabRate" Text="—" Margin="0,6,0,0" FontSize="14" />
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="端口数" Opacity="0.7" />
+                        <TextBlock Text="房间数" Opacity="0.7" />
                         <TextBlock x:Name="LabPorts" Text="—" Margin="0,6,0,0" FontSize="14" />
                     </StackPanel>
                 </Grid>
@@ -118,23 +118,44 @@
             </StackPanel>
         </local:MyCard>
 
-        <!-- 端口 -->
-        <local:MyCard Margin="0,0,0,10" Title="中继端口">
+        <local:MyCard Margin="0,0,0,10" Title="加入房间">
             <StackPanel Margin="14,32,14,14">
+                <TextBlock Text="输入朋友分享的房间码，加入后在游戏的多人游戏列表中选择“中继房间”即可进入。"
+                           Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <DockPanel Height="28">
+                    <local:MyButton x:Name="BtnJoin" DockPanel.Dock="Right" Text="加入房间"
+                                    ColorType="Highlight" Width="96" Margin="10,0,0,0" Click="BtnJoin_Click" />
+                    <local:MyTextBox x:Name="TextRoomCode" MaxLength="64" MaxLines="1" AcceptsReturn="False"
+                                     HintText="PCLCE-ABCDE-FGHJK-LMNPQ-RSTUV" FontFamily="Consolas" />
+                </DockPanel>
+                <StackPanel x:Name="PanJoinedRoom" Margin="0,14,0,0" Visibility="Collapsed">
+                    <TextBlock x:Name="LabJoinedName" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="LabJoinedCode" FontFamily="Consolas" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    <TextBlock Text="保持启动器运行，打开《我的世界》→ 多人游戏，等待局域网列表出现此房间。请使用与房主相同的游戏版本和模组。"
+                               Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </local:MyCard>
+
+        <local:MyCard Margin="0,0,0,10" Title="创建房间">
+            <StackPanel Margin="14,32,14,14">
+                <TextBlock Text="先进入游戏世界，在暂停菜单中选择“对局域网开放”。创建时会自动识别并验证游戏，房间码由云端生成。"
+                           Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,12" />
                 <DockPanel Height="28" Margin="0,0,0,12">
-                    <local:MyButton x:Name="BtnAllocate" DockPanel.Dock="Right" Text="分配并启动"
-                                    ColorType="Highlight" Width="112" Margin="10,0,0,0"
-                                    Click="BtnAllocate_Click" />
-                    <local:MyTextBox x:Name="TextLocalPort" DockPanel.Dock="Right" Width="88" Text="25565"
-                                     MaxLines="1" AcceptsReturn="False" />
-                    <TextBlock DockPanel.Dock="Right" Text="本地端口" VerticalAlignment="Center"
-                               Opacity="0.7" Margin="10,0,8,0" />
+                    <TextBlock DockPanel.Dock="Left" Text="节点" Width="48" VerticalAlignment="Center" Opacity="0.7" />
                     <local:MyComboBox x:Name="ComboNodes" DropDownWidthSync="False" />
                 </DockPanel>
-
-                <TextBlock x:Name="LabEmpty" Text="还没有分配的端口" Opacity="0.6" Margin="0,0,0,4" />
-
-                <ListBox x:Name="ListPorts" MinHeight="88" Background="Transparent" BorderThickness="0"
+                <DockPanel MinHeight="28" Margin="0,0,0,8">
+                    <local:MyButton x:Name="BtnAllocate" DockPanel.Dock="Right" Text="创建房间"
+                                    ColorType="Highlight" Width="96" Margin="10,0,0,0" Click="BtnAllocate_Click" />
+                    <local:MyButton x:Name="BtnScan" DockPanel.Dock="Right" Text="扫描游戏"
+                                    ColorType="Normal" Width="96" Margin="10,0,0,0" Click="BtnScan_Click" />
+                    <local:MyComboBox x:Name="ComboGames" DropDownWidthSync="False" Visibility="Collapsed" />
+                </DockPanel>
+                <TextBlock x:Name="LabScanHint" Text="点击创建房间即可自动扫描，无需填写端口。"
+                           Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,14" />
+                <TextBlock x:Name="LabEmpty" Text="还没有创建的房间" Opacity="0.6" Margin="0,0,0,4" />
+                <ListBox x:Name="ListRooms" MinHeight="44" Background="Transparent" BorderThickness="0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -143,19 +164,21 @@
                                 <DockPanel>
                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                                 VerticalAlignment="Center">
-                                        <local:MyButton Text="复制" ColorType="Normal" Width="64"
+                                        <local:MyButton Text="复制码" ColorType="Normal" Width="64" IsEnabled="{Binding CanCopy}"
                                                         Tag="{Binding}" Click="BtnCopy_Click" />
-                                        <local:MyButton Text="释放" ColorType="Normal" Width="64" Margin="8,0,0,0"
+                                        <local:MyButton Text="关闭" ColorType="Normal" Width="64" Margin="8,0,0,0"
                                                         Tag="{Binding}" Click="BtnRelease_Click" />
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding GameAddress}" FontFamily="Consolas"
-                                                   FontSize="14" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding RoomCode}" FontFamily="Consolas" TextWrapping="Wrap"
+                                                   FontSize="13" FontWeight="SemiBold" />
                                         <TextBlock Opacity="0.7" Margin="0,6,0,0" TextWrapping="Wrap">
-                                            <!-- Run.Text 在 WPF 中默认 TwoWay 绑定，PortItem 是只读计算属性，必须显式 OneWay，否则模板一实例化就 XamlParseException -->
+                                            <!-- Run.Text 默认 TwoWay，计算属性需要显式 OneWay。 -->
                                             <Run Text="{Binding NodeName, Mode=OneWay}" />
                                             <Run Text=" · " />
                                             <Run Text="{Binding Label, Mode=OneWay}" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding StateText, Mode=OneWay}" />
                                             <Run Text=" · 已用 " />
                                             <Run Text="{Binding UsageText, Mode=OneWay}" />
                                         </TextBlock>
