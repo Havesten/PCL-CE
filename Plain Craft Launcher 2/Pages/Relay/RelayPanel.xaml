@@ -152,7 +152,7 @@
                                     ColorType="Normal" Width="96" Margin="10,0,0,0" Click="BtnScan_Click" />
                     <local:MyComboBox x:Name="ComboGames" DropDownWidthSync="False" Visibility="Collapsed" />
                 </DockPanel>
-                <TextBlock x:Name="LabScanHint" Text="点击创建房间即可自动扫描，无需填写端口。"
+                <TextBlock x:Name="LabScanHint" Text="请在游戏内开启局域网联机。"
                            Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,14" />
                 <TextBlock x:Name="LabEmpty" Text="还没有创建的房间" Opacity="0.6" Margin="0,0,0,4" />
                 <ListBox x:Name="ListRooms" MinHeight="44" Background="Transparent" BorderThickness="0"
