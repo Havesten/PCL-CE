@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -28,6 +29,162 @@ public class RelayTunnelClientTest
     {
         var tunnel = new RelayTunnel("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port, "same-allocation", RemotePort);
         return new TunnelClient(tunnel, localPort, "test", heartbeat ?? TimeSpan.FromSeconds(25));
+    }
+
+    [TestMethod]
+    public async Task MissingNodeDnsFailsPromptlyWithSafeActionableMessage()
+    {
+        const string hostname = "pclce-relay-qa-no-record.invalid";
+        const string secret = "private-qa-tunnel-token";
+        using var client = new TunnelClient(new RelayTunnel(hostname, 40001, secret, RemotePort), 25565, "dns-test", TimeSpan.FromSeconds(25),
+            (_, _, _, _) => ValueTask.FromException(new SocketException((int)SocketError.HostNotFound)));
+        var elapsed = Stopwatch.StartNew();
+        var error = await client.StartAsync(TimeSpan.FromSeconds(20)).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.IsNotNull(error);
+        Assert.AreEqual(TunnelFailureCode.Dns, client.LastFailureCode);
+        Assert.IsTrue(elapsed.Elapsed < TimeSpan.FromSeconds(5), "A missing DNS record used the whole startup retry budget.");
+        Assert.IsTrue(error.Contains("解析", StringComparison.Ordinal));
+        Assert.IsFalse(error.Contains(hostname, StringComparison.Ordinal));
+        Assert.IsFalse(error.Contains(secret, StringComparison.Ordinal));
+        Assert.IsFalse(client.IsRunning);
+    }
+
+    [TestMethod]
+    public async Task RefusedControlPortReportsConnectionFailureWithoutEndpoint()
+    {
+        using var client = new TunnelClient(new RelayTunnel("127.0.0.1", 40001, "private-token", RemotePort), 25565, "refused-test", TimeSpan.FromSeconds(25),
+            (_, _, _, _) => ValueTask.FromException(new SocketException((int)SocketError.ConnectionRefused)));
+        var error = await client.StartAsync(TimeSpan.FromMilliseconds(250));
+        Assert.IsNotNull(error);
+        Assert.AreEqual(TunnelFailureCode.Connection, client.LastFailureCode);
+        Assert.IsFalse(error.Contains("127.0.0.1", StringComparison.Ordinal));
+        Assert.IsFalse(error.Contains("private-token", StringComparison.Ordinal));
+        Assert.IsFalse(client.IsRunning);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RemoteHandshakeRejectionUsesSafeStageAndHidesPayload(bool authSucceeds)
+    {
+        var listener = Listen();
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        using var client = Client(listener);
+        const string remoteText = "do-not-display same-allocation 127.0.0.1 private@example.test";
+        var server = Task.Run(async () =>
+        {
+            try
+            {
+                while (!budget.IsCancellationRequested)
+                {
+                    using var peer = await listener.AcceptTcpClientAsync(budget.Token);
+                    var stream = peer.GetStream();
+                    Assert.AreEqual(0x01, (int)(await ReadFrame(stream, budget.Token)).Type);
+                    if (authSucceeds)
+                    {
+                        await WriteFrame(stream, 0x02, [], budget.Token);
+                        Assert.AreEqual(0x04, (int)(await ReadFrame(stream, budget.Token)).Type);
+                    }
+                    await WriteFrame(stream, 0x03, Encoding.UTF8.GetBytes(remoteText), budget.Token);
+                }
+            }
+            catch (Exception error) when (error is OperationCanceledException or SocketException or IOException) { }
+        });
+        try
+        {
+            var error = await client.StartAsync(TimeSpan.FromMilliseconds(450), budget.Token);
+            Assert.IsNotNull(error);
+            Assert.AreEqual(authSucceeds ? TunnelFailureCode.Registration : TunnelFailureCode.Authentication, client.LastFailureCode);
+            Assert.IsFalse(error.Contains(remoteText, StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains("same-allocation", StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains("127.0.0.1", StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains("private@example.test", StringComparison.Ordinal));
+            Assert.AreEqual(client.FailureMessage, error);
+            Assert.IsFalse(client.IsRunning);
+        }
+        finally
+        {
+            budget.Cancel();
+            listener.Stop();
+            await server;
+        }
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task PrematureHandshakeCloseReportsSafeConnectionClosed(bool authSucceeds)
+    {
+        var listener = Listen();
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        const string secret = "handshake-close-private-token";
+        const string remoteText = "do-not-display private@example.test control-secret";
+        var tunnel = new RelayTunnel("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port, secret, RemotePort);
+        using var client = new TunnelClient(tunnel, 25565, "close-test", TimeSpan.FromSeconds(25));
+        var handshakes = 0;
+        var server = Task.Run(async () =>
+        {
+            try
+            {
+                while (!budget.IsCancellationRequested)
+                {
+                    using var peer = await listener.AcceptTcpClientAsync(budget.Token);
+                    var stream = peer.GetStream();
+                    var auth = await ReadFrame(stream, budget.Token);
+                    Assert.AreEqual(0x01, (int)auth.Type);
+                    Assert.AreEqual(secret, Encoding.UTF8.GetString(auth.Payload));
+                    if (authSucceeds)
+                    {
+                        await WriteFrame(stream, 0x02, Encoding.UTF8.GetBytes(remoteText), budget.Token);
+                        Assert.AreEqual(0x04, (int)(await ReadFrame(stream, budget.Token)).Type);
+                    }
+                    Interlocked.Increment(ref handshakes);
+                    // Close without an ERR frame, as a filtering/forwarding peer can do.
+                }
+            }
+            catch (Exception error) when (error is OperationCanceledException or SocketException or IOException) { }
+        });
+        try
+        {
+            var error = await client.StartAsync(TimeSpan.FromMilliseconds(450), budget.Token);
+            Assert.IsNotNull(error);
+            Assert.IsTrue(Volatile.Read(ref handshakes) > 0, "The loopback peer did not reach the requested handshake stage.");
+            Assert.AreEqual(TunnelFailureCode.ConnectionClosed, client.LastFailureCode);
+            Assert.AreEqual(client.FailureMessage, error);
+            Assert.IsFalse(error.Contains(secret, StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains(remoteText, StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains("private@example.test", StringComparison.Ordinal));
+            Assert.IsFalse(error.Contains("127.0.0.1", StringComparison.Ordinal));
+            Assert.IsFalse(client.IsRunning);
+            Assert.IsFalse(client.IsConnected);
+        }
+        finally
+        {
+            budget.Cancel();
+            listener.Stop();
+            await server;
+        }
+    }
+
+    [TestMethod]
+    public async Task UnexpectedHandshakeFrameIsProtocolFailure()
+    {
+        var listener = Listen();
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var client = Client(listener);
+        var server = Task.Run(async () =>
+        {
+            using var peer = await listener.AcceptTcpClientAsync(budget.Token);
+            await ReadFrame(peer.GetStream(), budget.Token);
+            await WriteFrame(peer.GetStream(), 0x08, [], budget.Token);
+        });
+        try
+        {
+            Assert.IsNotNull(await client.StartAsync(TimeSpan.FromMilliseconds(300), budget.Token));
+            Assert.AreEqual(TunnelFailureCode.Protocol, client.LastFailureCode);
+            await server;
+        }
+        finally { budget.Cancel(); listener.Stop(); await server; }
     }
 
     [TestMethod]
@@ -59,6 +216,7 @@ public class RelayTunnelClientTest
             var elapsed = Stopwatch.StartNew();
             var error = await client.StartAsync(TimeSpan.FromMilliseconds(200), budget.Token);
             Assert.IsNotNull(error);
+            Assert.AreEqual(TunnelFailureCode.Timeout, client.LastFailureCode);
             Assert.IsTrue(elapsed.Elapsed < TimeSpan.FromSeconds(2), "Handshake exceeded its complete timeout budget.");
             Assert.IsFalse(client.IsRunning);
         }
@@ -190,6 +348,7 @@ public class RelayTunnelClientTest
             await ReadFrame(peer.GetStream(), budget.Token);
             client.Dispose();
             Assert.IsNotNull(await start.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.AreEqual(TunnelFailureCode.Cancelled, client.LastFailureCode);
             Assert.IsFalse(client.IsRunning);
             Assert.IsFalse(client.IsConnected);
         }

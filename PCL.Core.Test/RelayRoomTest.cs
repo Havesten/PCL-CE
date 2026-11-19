@@ -20,6 +20,38 @@ public class RelayRoomTest
     private const string Code = "PCLCE-ABCDE-FGHJK-LMNPQ-RSTUV";
 
     [TestMethod]
+    public void TunnelSyncIntervalSupportsOldCloudAndExplicitPolling()
+    {
+        var legacy = JsonSerializer.Deserialize<RelayTunnel>("{\"server_addr\":\"127.0.0.1\",\"server_port\":40001,\"token\":\"qa\",\"remote_port\":40007}");
+        Assert.IsNotNull(legacy);
+        Assert.AreEqual(5, legacy.SyncIntervalSeconds);
+        var slow = JsonSerializer.Deserialize<RelayTunnel>("{\"server_addr\":\"127.0.0.1\",\"server_port\":40001,\"token\":\"qa\",\"remote_port\":40007,\"sync_interval_seconds\":30}");
+        Assert.IsNotNull(slow);
+        Assert.AreEqual(30, slow.SyncIntervalSeconds);
+    }
+
+    [TestMethod]
+    public async Task HostDnsFailureDoesNotPublishReadyAndHidesCredentials()
+    {
+        await using var game = new MinecraftFixture();
+        await using var control = new ControlFixture(stall: true);
+        var requests = 0;
+        using var http = FakeHttp(_ => { Interlocked.Increment(ref requests); return Json(new { ok = true }); });
+        var allocation = Allocation(control);
+        allocation = allocation with { Tunnel = allocation.Tunnel with { ServerAddr = "pclce-relay-host-no-record.invalid" } };
+        using var tunnel = new TunnelClient(allocation.Tunnel, game.Endpoint.Port, "host-dns-test", TimeSpan.FromSeconds(25),
+            (_, _, _, _) => ValueTask.FromException(new SocketException((int)SocketError.HostNotFound)));
+        await using var host = new RelayRoomHost(new RelayApi(http, "3.2.1"), allocation, new RelayGameServer(game.Endpoint, "World", "1.21.1"),
+            TimeSpan.FromSeconds(20), tunnel);
+        var error = await Assert.ThrowsAsync<IOException>(() => host.StartAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.IsTrue(error.Message.Contains("解析", StringComparison.Ordinal));
+        Assert.IsFalse(error.Message.Contains(allocation.Tunnel.Token, StringComparison.Ordinal));
+        Assert.IsFalse(error.Message.Contains(allocation.Tunnel.ServerAddr, StringComparison.Ordinal));
+        Assert.AreEqual(0, requests, "Failed tunnel published a ready room.");
+        Assert.IsFalse(host.IsRunning);
+    }
+
+    [TestMethod]
     public async Task HostDisposeDuringHandshakeWaitsForStartupAndDoesNotMarkReady()
     {
         await using var game = new MinecraftFixture();

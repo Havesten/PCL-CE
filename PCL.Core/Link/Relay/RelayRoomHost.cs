@@ -29,7 +29,8 @@ public sealed class RelayRoomHost : IDisposable, IAsyncDisposable
     public RelayRoomHost(RelayApi api, RelayAllocationResult result, RelayGameServer game)
         : this(api, result, game, TimeSpan.FromSeconds(20)) { }
 
-    internal RelayRoomHost(RelayApi api, RelayAllocationResult result, RelayGameServer game, TimeSpan heartbeatInterval)
+    internal RelayRoomHost(RelayApi api, RelayAllocationResult result, RelayGameServer game, TimeSpan heartbeatInterval,
+        TunnelClient? tunnelClient = null)
     {
         if (!RelayRoomCode.TryNormalize(result.Allocation.RoomCode, out _))
             throw new InvalidOperationException("云端尚未支持房间码，请先升级云端至 3.2.1");
@@ -37,7 +38,7 @@ public sealed class RelayRoomHost : IDisposable, IAsyncDisposable
         _game = game;
         Allocation = result.Allocation;
         _heartbeatInterval = heartbeatInterval;
-        _tunnel = new TunnelClient(result.Tunnel, game.Endpoint, "room-" + Allocation.Id);
+        _tunnel = tunnelClient ?? new TunnelClient(result.Tunnel, game.Endpoint, "room-" + Allocation.Id);
     }
 
     public Task StartAsync(CancellationToken ct = default)
@@ -54,8 +55,10 @@ public sealed class RelayRoomHost : IDisposable, IAsyncDisposable
     private async Task StartCoreAsync(CancellationToken ct)
     {
         using var cancellation = ct.Register(() => _lifetime.Cancel());
-        var error = await _tunnel.StartAsync(TimeSpan.FromSeconds(20), _lifetime.Token).ConfigureAwait(false);
-        if (error is not null) throw new IOException("房间连接失败，请检查网络或选择其他节点后重试");
+        var syncInterval = Math.Clamp(_tunnel.SyncIntervalSeconds, 1, 300);
+        var timeout = TimeSpan.FromSeconds(Math.Clamp(syncInterval * 2 + 15, 60, 180));
+        var error = await _tunnel.StartAsync(timeout, _lifetime.Token).ConfigureAwait(false);
+        if (error is not null) throw new IOException(error);
         var proof = await MinecraftServerProbe.ProbeAsync(_game.Endpoint, TimeSpan.FromSeconds(3), _lifetime.Token).ConfigureAwait(false);
         if (proof is null) throw new IOException("游戏房间已关闭，请先在游戏中打开局域网后重试");
         await _api.SetRoomReadyAsync(Allocation.Id, true, _lifetime.Token).ConfigureAwait(false);
@@ -83,7 +86,7 @@ public sealed class RelayRoomHost : IDisposable, IAsyncDisposable
             using var timer = new PeriodicTimer(_heartbeatInterval);
             while (await timer.WaitForNextTickAsync(_lifetime.Token).ConfigureAwait(false))
             {
-                if (!_tunnel.IsRunning) { closingReason = "房间连接已停止，请重新创建房间"; break; }
+                if (!_tunnel.IsRunning) { closingReason = _tunnel.FailureMessage; break; }
                 try
                 {
                     var ready = _tunnel.IsConnected;

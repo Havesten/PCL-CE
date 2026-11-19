@@ -105,7 +105,8 @@ public sealed record RelayTunnel(
     [property: JsonPropertyName("server_addr")] string ServerAddr,
     [property: JsonPropertyName("server_port")] int ServerPort,
     [property: JsonPropertyName("token")] string Token,
-    [property: JsonPropertyName("remote_port")] int RemotePort);
+    [property: JsonPropertyName("remote_port")] int RemotePort,
+    [property: JsonPropertyName("sync_interval_seconds")] int SyncIntervalSeconds = 5);
 
 public sealed record RelayAllocationResult(
     [property: JsonPropertyName("allocation")] RelayAllocation Allocation,

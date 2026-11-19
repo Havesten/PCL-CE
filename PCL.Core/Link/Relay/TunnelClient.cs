@@ -2,13 +2,17 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.Logging;
 
 namespace PCL.Core.Link.Relay;
+
+public enum TunnelFailureCode { None, Dns, Connection, ConnectionClosed, Timeout, Authentication, Registration, Protocol, Cancelled, Unknown }
 
 /// <summary>
 ///     自研隧道客户端（PTP v1）。完全内嵌在启动器里，无需外部二进制。
@@ -48,6 +52,7 @@ public sealed class TunnelClient : IDisposable
     private readonly string _localAddress;
     private readonly string _label;
     private readonly TimeSpan _pingInterval;
+    private readonly Func<TcpClient, string, int, CancellationToken, ValueTask> _connectControl;
 
     private readonly object _stateLock = new();
     private ControlConnection? _connection;
@@ -62,6 +67,7 @@ public sealed class TunnelClient : IDisposable
 
     private volatile bool _running;
     private int _disposed;
+    private TunnelFailureCode _lastFailureCode;
 
     public TunnelClient(RelayTunnel tunnel, int localPort, string label)
         : this(tunnel, localPort, label, PingInterval)
@@ -73,18 +79,26 @@ public sealed class TunnelClient : IDisposable
     {
     }
 
+    internal TunnelClient(RelayTunnel tunnel, int localPort, string label, TimeSpan pingInterval,
+        Func<TcpClient, string, int, CancellationToken, ValueTask> connectControl)
+        : this(tunnel, new IPEndPoint(IPAddress.Loopback, localPort), label, pingInterval, connectControl)
+    {
+    }
+
     public TunnelClient(RelayTunnel tunnel, IPEndPoint gameEndpoint, string label)
         : this(tunnel, gameEndpoint, label, PingInterval)
     {
     }
 
-    private TunnelClient(RelayTunnel tunnel, IPEndPoint gameEndpoint, string label, TimeSpan pingInterval)
+    private TunnelClient(RelayTunnel tunnel, IPEndPoint gameEndpoint, string label, TimeSpan pingInterval,
+        Func<TcpClient, string, int, CancellationToken, ValueTask>? connectControl = null)
     {
         _tunnel = tunnel;
         _localPort = gameEndpoint.Port;
         _localAddress = gameEndpoint.Address.ToString();
         _label = string.IsNullOrWhiteSpace(label) ? "pcl-relay" : label;
         _pingInterval = pingInterval;
+        _connectControl = connectControl ?? ((client, host, port, ct) => client.ConnectAsync(host, port, ct));
     }
 
     private sealed class ControlConnection(TcpClient client, CancellationToken ct) : IDisposable
@@ -110,6 +124,24 @@ public sealed class TunnelClient : IDisposable
 
     public bool IsRunning => _running;
     public bool IsConnected => _connected;
+    public int SyncIntervalSeconds => _tunnel.SyncIntervalSeconds;
+    public TunnelFailureCode LastFailureCode => _lastFailureCode;
+    public string FailureMessage => _lastFailureCode switch
+    {
+        TunnelFailureCode.Dns => "中继节点地址解析失败，请联系管理员检查节点域名的 A/AAAA 记录",
+        TunnelFailureCode.Connection => "无法连接中继节点的控制端口，请联系管理员检查端口开放与节点配置",
+        TunnelFailureCode.ConnectionClosed => "中继节点提前关闭了连接。使用代理或 TUN 时，请确认出口地区符合节点规则；仍无法连接请联系管理员检查控制端口及转发配置",
+        TunnelFailureCode.Timeout => "中继连接超时，请检查控制端口连通性；节点在线不代表连接端口可用",
+        TunnelFailureCode.Authentication => "中继节点尚未同步房间凭据或鉴权失败，请稍后重试；持续失败请联系管理员检查分配同步",
+        TunnelFailureCode.Registration => "中继房间端口注册失败，请联系管理员检查端口映射与分配配置",
+        TunnelFailureCode.Protocol => "中继节点协议不兼容，请联系管理员检查节点程序和控制端口",
+        TunnelFailureCode.Cancelled => "房间连接已取消",
+        _ => "房间连接失败，请检查网络后重试"
+    };
+    private sealed class TunnelFailureException(TunnelFailureCode code) : IOException
+    {
+        public TunnelFailureCode Code { get; } = code;
+    }
 
     public async Task<string?> StartAsync(TimeSpan timeout, CancellationToken ct = default)
     {
@@ -139,28 +171,56 @@ public sealed class TunnelClient : IDisposable
         catch (Exception ex)
         {
             _running = false;
+            _lastFailureCode = FailureCode(ex, ct.IsCancellationRequested || _disposed != 0);
+            LogWrapper.Warn("Relay", $"中继连接失败，诊断={_lastFailureCode}");
             await CleanupAsync().ConfigureAwait(false);
-            return ex is OperationCanceledException ? "隧道连接已取消或超时" : ex.Message;
+            return FailureMessage;
         }
     }
 
+    private static TunnelFailureCode FailureCode(Exception error, bool cancelled = false) => cancelled ? TunnelFailureCode.Cancelled : error switch
+    {
+        TunnelFailureException failure => failure.Code,
+        OperationCanceledException => cancelled ? TunnelFailureCode.Cancelled : TunnelFailureCode.Timeout,
+        SocketException socket when socket.SocketErrorCode is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain => TunnelFailureCode.Dns,
+        SocketException socket when socket.SocketErrorCode == SocketError.TimedOut => TunnelFailureCode.Timeout,
+        SocketException socket when socket.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted => TunnelFailureCode.ConnectionClosed,
+        SocketException => TunnelFailureCode.Connection,
+        InvalidDataException => TunnelFailureCode.Protocol,
+        EndOfStreamException => TunnelFailureCode.ConnectionClosed,
+        IOException { InnerException: SocketException socket } when socket.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted => TunnelFailureCode.ConnectionClosed,
+        IOException => TunnelFailureCode.Connection,
+        _ => TunnelFailureCode.Unknown
+    };
+
     private async Task<ControlConnection> ConnectWithRetryAsync(TimeSpan timeout, CancellationToken ct)
     {
-        var deadline = DateTime.UtcNow + timeout;
+        var elapsed = Stopwatch.StartNew();
         Exception? lastError = null;
         while (!ct.IsCancellationRequested)
         {
-            var remaining = deadline - DateTime.UtcNow;
+            var remaining = timeout - elapsed.Elapsed;
             if (remaining <= TimeSpan.Zero) break;
-            try { return await ConnectControlAsync(remaining, ct).ConfigureAwait(false); }
+            try
+            {
+                var attemptTimeout = remaining < TimeSpan.FromSeconds(8) ? remaining : TimeSpan.FromSeconds(8);
+                return await ConnectControlAsync(attemptTimeout, ct).ConfigureAwait(false);
+            }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception ex) { lastError = ex; }
-            remaining = deadline - DateTime.UtcNow;
+            catch (Exception ex)
+            {
+                var code = FailureCode(ex);
+                if (code is TunnelFailureCode.Dns or TunnelFailureCode.Protocol or TunnelFailureCode.Registration) throw;
+                // 最后一轮可能只剩数毫秒；保留此前明确的连接或鉴权诊断。
+                if (code != TunnelFailureCode.Timeout || lastError is null) lastError = ex;
+            }
+            remaining = timeout - elapsed.Elapsed;
             if (remaining <= TimeSpan.Zero) break;
             await Task.Delay(remaining < AuthRetryDelay ? remaining : AuthRetryDelay, ct).ConfigureAwait(false);
         }
         ct.ThrowIfCancellationRequested();
-        throw new IOException(lastError?.Message ?? "隧道连接超时", lastError);
+        if (lastError is not null) throw lastError;
+        throw new TunnelFailureException(TunnelFailureCode.Timeout);
     }
 
     private async Task<ControlConnection> ConnectControlAsync(TimeSpan timeout, CancellationToken ct)
@@ -171,18 +231,18 @@ public sealed class TunnelClient : IDisposable
             using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
             budget.CancelAfter(timeout); // 连接、AUTH、REGISTER 共用完整超时预算
             var token = budget.Token;
-            await client.ConnectAsync(_tunnel.ServerAddr, _tunnel.ServerPort, token).ConfigureAwait(false);
+            await _connectControl(client, _tunnel.ServerAddr, _tunnel.ServerPort, token).ConfigureAwait(false);
             var stream = client.GetStream();
             await WriteFrame(stream, FrameAuth, System.Text.Encoding.UTF8.GetBytes(_tunnel.Token), token).ConfigureAwait(false);
             var (typ, payload) = await ReadFrame(stream, token).ConfigureAwait(false);
-            if (typ == FrameErr) throw new IOException("鉴权失败：" + System.Text.Encoding.UTF8.GetString(payload));
-            if (typ != FrameOk) throw new InvalidDataException($"意外的响应帧 0x{typ:X2}");
+            if (typ == FrameErr) throw new TunnelFailureException(TunnelFailureCode.Authentication);
+            if (typ != FrameOk) throw new TunnelFailureException(TunnelFailureCode.Protocol);
             var port = new byte[2];
             BinaryPrimitives.WriteUInt16BigEndian(port, (ushort)_tunnel.RemotePort);
             await WriteFrame(stream, FrameRegister, port, token).ConfigureAwait(false);
             (typ, payload) = await ReadFrame(stream, token).ConfigureAwait(false);
-            if (typ == FrameErr) throw new IOException("注册失败：" + System.Text.Encoding.UTF8.GetString(payload));
-            if (typ != FrameOk) throw new InvalidDataException($"意外的响应帧 0x{typ:X2}");
+            if (typ == FrameErr) throw new TunnelFailureException(TunnelFailureCode.Registration);
+            if (typ != FrameOk) throw new TunnelFailureException(TunnelFailureCode.Protocol);
             return new ControlConnection(client, ct);
         }
         catch { client.Dispose(); throw; }
@@ -209,10 +269,16 @@ public sealed class TunnelClient : IDisposable
                 }
                 if (ct.IsCancellationRequested) break;
                 // 更新重启、NAT 断开等情况下自动重新注册同一分配，保持原公网地址。
-                connection = await ConnectWithRetryAsync(TimeSpan.FromSeconds(90), ct).ConfigureAwait(false);
+                var recoverySeconds = Math.Clamp(Math.Clamp(SyncIntervalSeconds, 1, 300) * 2 + 15, 90, 180);
+                connection = await ConnectWithRetryAsync(TimeSpan.FromSeconds(recoverySeconds), ct).ConfigureAwait(false);
             }
         }
-        catch (Exception) { /* 重连预算耗尽或用户停止 */ }
+        catch (Exception ex)
+        {
+            _lastFailureCode = FailureCode(ex, ct.IsCancellationRequested || _disposed != 0);
+            if (_lastFailureCode != TunnelFailureCode.Cancelled)
+                LogWrapper.Warn("Relay", $"中继恢复失败，诊断={_lastFailureCode}");
+        }
         finally
         {
             _running = false;
