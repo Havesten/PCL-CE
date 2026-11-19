@@ -200,7 +200,7 @@ public partial class MyLocalCompItem
             // 标签
             if (Entry.IsFolder)
                 // 为文件夹添加标签
-                Tags = [Lang.Text("Instance.Resource.Item.FolderTag")];
+                Tags = ["Instance.Resource.Item.FolderTag"];
             else if (Entry.Comp is not null) Tags = Entry.Comp.Tags;
         }));
     }
@@ -520,9 +520,10 @@ public partial class MyLocalCompItem
         set
         {
             PanTags.Children.Clear();
-            _vm.TagsVisibility = value.Any() ? Visibility.Visible : Visibility.Collapsed;
             foreach (var tagText in value)
             {
+                if (string.IsNullOrEmpty(Lang.Text(tagText))) continue;
+
                 var newTag = new Border
                 {
                     Background = new SolidColorBrush(Color.FromArgb(12, 0, 0, 0)),
@@ -534,15 +535,17 @@ public partial class MyLocalCompItem
                 };
                 var tagTextBlock = new TextBlock
                 {
-                    Text = tagText,
                     Foreground = new SolidColorBrush(ThemeManager.IsDarkMode
                         ? Color.FromArgb(88, 255, 255, 255)
                         : Color.FromArgb(88, 136, 136, 136)),
                     FontSize = 11d
                 };
+                var tagKey = tagText;
+                LocalizedText.TryBind(tagTextBlock, nameof(TextBlock.Text), () => Lang.Text(tagKey));
                 newTag.Child = tagTextBlock;
                 PanTags.Children.Add(newTag);
             }
+            _vm.TagsVisibility = PanTags.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

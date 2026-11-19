@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PCL.Core.App;
 using PCL.Core.Link.Relay;
@@ -21,6 +24,7 @@ public partial class RelayPanel : UserControl
     private readonly RelaySession _session = RelaySession.Load();
     private readonly RelayApi _api;
     private readonly DispatcherTimer _timer;
+    private readonly DispatcherTimer _realNameTimer;
     private readonly CancellationTokenSource _lifetime = new();
     private RelayCaptcha? _captcha;
     private RelayRoomHost? _host;
@@ -40,11 +44,44 @@ public partial class RelayPanel : UserControl
     private bool _phonePrompted;
     // 服务端按来源 IP 判定不在中国大陆时为 true：登录与分配都禁用。
     private bool _regionBlocked;
+    private bool _realNameCloudEnabled;
+    private bool _realNameRequired;
+    private bool _realNameVerified;
+    private bool _realNamePolling;
+    private string? _realNamePublicKey;
+    private RelayRealNameRules? _realNameRules;
+    private RelayServiceTerms? _relayTerms;
+    private RelayServiceTerms? _confirmedTerms;
+    private string? _termsReadToken;
+    private string? _termsSessionToken;
+    private DateTimeOffset _termsReadExpiresAt;
+    private long _realNamePolicyRevision;
+    private DialogViewModel? _termsDialog;
+    private string _lastValidRealName = string.Empty;
+    private bool _nameCompositionActive;
+    private bool _nameValidationQueued;
+    private bool _restoringRealName;
+    private bool _loadingTerms;
 
     public RelayPanel()
     {
         InitializeComponent();
+        foreach (var consent in new[] { CheckRealNameSensitiveConsent, CheckRealNameAlipayConsent })
+        {
+            consent.LabText.TextWrapping = TextWrapping.Wrap;
+            consent.LabText.FontSize = 12;
+            consent.LabText.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
         _api = RelaySession.CreateApi(_session);
+        DataObject.AddPastingHandler(TextRealName, TextRealName_Pasting);
+        DataObject.AddPastingHandler(PasswordRealNameId, PasswordRealNameId_Pasting);
+        TextCompositionManager.AddPreviewTextInputStartHandler(TextRealName, (_, _) => _nameCompositionActive = true);
+        TextCompositionManager.AddPreviewTextInputUpdateHandler(TextRealName, (_, _) => _nameCompositionActive = true);
+        TextRealName.LostKeyboardFocus += (_, _) =>
+        {
+            _nameCompositionActive = false;
+            QueueRealNameValidation();
+        };
         // 这个面板常驻在联机页里，只有真正切到这个子页面时才算可见，
         // 所以初始化挂在可见性变化上，避免启动时就发请求。
         IsVisibleChanged += OnVisibleChanged;
@@ -59,6 +96,8 @@ public partial class RelayPanel : UserControl
             if (!IsVisible || !_session.IsValid || _busy || _regionBlocked) return;
             await RefreshAsync().ConfigureAwait(true);
         };
+        _realNameTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _realNameTimer.Tick += async (_, _) => await RefreshRealNameStatusAsync().ConfigureAwait(true);
     }
 
     private async void OnVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -66,6 +105,8 @@ public partial class RelayPanel : UserControl
         if (!IsVisible)
         {
             _timer.Stop();
+            _realNameTimer.Stop();
+            _termsDialog?.Close(DialogResult.None);
             return;
         }
 
@@ -73,6 +114,7 @@ public partial class RelayPanel : UserControl
         if (_host is null && _guest is null)
         {
             var stored = RelaySession.Load();
+            if (_session.Token != stored.Token) ResetTermsConfirmation();
             _session.Token = stored.Token;
             _session.Email = stored.Email;
             _session.ExpiresAt = stored.ExpiresAt;
@@ -164,9 +206,14 @@ public partial class RelayPanel : UserControl
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             var status = await _api.GetStatusAsync(cts.Token).ConfigureAwait(true);
+            if (_exiting) return;
 
             _roomsSupported = status.RoomCodes;
             _relayEnabled = status.RelayEnabled;
+            _realNameCloudEnabled = status.RealNameEnabled;
+            _realNameRequired = _realNameCloudEnabled;
+            _realNamePublicKey = status.RealNamePublicKey;
+            ApplyRealNamePolicy(status);
             if (!_relayEnabled) SetStatus("中继联机已由管理员关闭");
             if (!_roomsSupported) SetStatus("云端需要升级至 3.2.1 才能使用房间码");
             var required = status.RequiredVersion?.Trim();
@@ -188,6 +235,15 @@ public partial class RelayPanel : UserControl
         }
         finally
         {
+            if (!_exiting && !_realNameCloudEnabled)
+            {
+                _realNameRequired = false;
+                _realNameTimer.Stop();
+                PanRealName.Visibility = Visibility.Collapsed;
+                BtnRealName.Visibility = Visibility.Collapsed;
+                ClearRealNameInput();
+                ImgRealNameQr.Source = null;
+            }
             UpdateButtons();
         }
     }
@@ -288,6 +344,7 @@ public partial class RelayPanel : UserControl
             SetBusy(true, "正在登录…");
             var result = await _api.LoginAsync(email, code).ConfigureAwait(true);
 
+            ResetTermsConfirmation();
             _session.Token = result.Token;
             _session.Email = result.User.Email;
             _session.ExpiresAt = result.ExpiresAt;
@@ -357,7 +414,7 @@ public partial class RelayPanel : UserControl
             var result = await DialogService.Instance.ShowAsync(new PhoneBindDialogRequest
             {
                 Title = "绑定手机号",
-                Content = "根据相关法律法规，使用中继联机服务需要绑定手机号。",
+                Content = "本服务已启用手机号绑定验证。请使用本人手机号完成验证，客户端仅显示脱敏后的绑定状态。",
                 Buttons = DialogButtons.From(
                     DialogButton.Create("绑定手机号"),
                     DialogButton.Create("稍后再说")),
@@ -438,6 +495,8 @@ public partial class RelayPanel : UserControl
             }
 
             ApplyNodes(nodes);
+            if (_realNameRequired && IsRealNamePending(me.User.RealNameStatus) && IsVisible)
+                _ = RefreshRealNameStatusAsync();
         }
         catch (RelayApiException ex) when (ex.Status == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -461,6 +520,8 @@ public partial class RelayPanel : UserControl
     private void ApplyMe(RelayMe me)
     {
         _banned = me.IsBanned;
+        _realNameRequired = _realNameCloudEnabled && me.User.RealNameEnabled != false;
+        _realNameVerified = me.User.RealNameVerified || _realNameVerified;
         SetAuthState(_banned ? AuthState.Banned : AuthState.LoggedIn, me);
         if (_banned)
         {
@@ -469,8 +530,504 @@ public partial class RelayPanel : UserControl
         }
         // 未绑定手机号且服务端强制绑定时，账号卡上给一个手动入口
         BtnBindPhone.Visibility = me.PhoneRequired ? Visibility.Visible : Visibility.Collapsed;
+        ApplyRealNameUi(me.User.RealNameStatus, me.User.RealNameIdMasked);
         UpdateButtons();
     }
+
+    private bool HasRealNamePolicy => _realNameRules?.IsValidConfiguration == true &&
+        !string.IsNullOrWhiteSpace(_realNameRules.BirthDateMax) &&
+        _relayTerms is { } terms && !string.IsNullOrWhiteSpace(terms.Title) &&
+        !string.IsNullOrWhiteSpace(terms.Version) && !string.IsNullOrWhiteSpace(terms.Content);
+
+    private void ApplyRealNamePolicy(RelayStatus status)
+    {
+        if (_realNameRules != status.RealNameRules || _relayTerms != status.RelayTerms)
+            ResetTermsConfirmation("服务条款或实名认证规则已更新，请重新阅读并确认。");
+        _realNameRules = status.RealNameRules;
+        _relayTerms = status.RelayTerms;
+        UpdateButtons();
+    }
+
+    private bool HasConfirmedTerms => HasRealNamePolicy && _confirmedTerms == _relayTerms &&
+        _session.IsValid && !string.IsNullOrWhiteSpace(_termsReadToken) &&
+        _termsSessionToken == _api.Token && _termsReadExpiresAt > DateTimeOffset.UtcNow;
+
+    private void ResetTermsConfirmation(string? reason = null)
+    {
+        _confirmedTerms = null;
+        _termsReadToken = null;
+        _termsSessionToken = null;
+        _termsReadExpiresAt = default;
+        _realNamePolicyRevision++;
+        _termsDialog?.Close(DialogResult.None);
+        if (CheckRealNameSensitiveConsent is not null) CheckRealNameSensitiveConsent.Checked = false;
+        if (CheckRealNameAlipayConsent is not null) CheckRealNameAlipayConsent.Checked = false;
+        if (LabRealNameTermsStatus is not null)
+            LabRealNameTermsStatus.Text = reason ?? "请先阅读并确认条款，再分别确认以下授权事项。";
+    }
+
+    private async void BtnRelayTerms_Click(object sender, EventArgs e)
+    {
+        if (_loadingTerms || _exiting || !IsVisible) return;
+        _loadingTerms = true;
+        UpdateButtons();
+        var sessionToken = _api.Token;
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            cts.CancelAfter(TimeSpan.FromSeconds(8));
+            var status = await _api.GetStatusAsync(cts.Token).ConfigureAwait(true);
+            if (_exiting || !IsVisible || _api.Token != sessionToken) return;
+            ApplyRealNamePolicy(status);
+            if (_relayTerms is not { } terms || string.IsNullOrWhiteSpace(terms.Title) ||
+                string.IsNullOrWhiteSpace(terms.Version) || string.IsNullOrWhiteSpace(terms.Content))
+            {
+                SetStatus("云端尚未提供中继服务条款，请联系服务管理员。");
+                return;
+            }
+            var requiresConfirmation = _session.IsValid && _realNameRequired && !IsRealNameVerified;
+            RelayRealNameTermsRead? ticket = null;
+            if (requiresConfirmation)
+            {
+                ResetTermsConfirmation();
+                if (!HasRealNamePolicy)
+                {
+                    SetStatus("暂未取得完整的实名认证规则，请联系服务管理员确认云端配置。");
+                    return;
+                }
+                ticket = await _api.OpenRealNameTermsAsync(terms.Version, cts.Token).ConfigureAwait(true);
+                if (_exiting || !IsVisible || _api.Token != sessionToken) return;
+                if (ticket.Terms != terms || ticket.Terms != _relayTerms ||
+                    string.IsNullOrWhiteSpace(ticket.ReadToken) || ticket.MinimumReadSeconds is < 10 or > 300 ||
+                    ticket.ExpiresAt <= DateTimeOffset.UtcNow.AddSeconds(ticket.MinimumReadSeconds))
+                {
+                    SetStatus("条款内容或阅读确认凭据已变更，请重新打开条款。");
+                    return;
+                }
+            }
+            var policyRevision = _realNamePolicyRevision;
+            var rules = _realNameRules;
+            bool CanConfirm() => !_exiting && IsVisible && _session.IsValid && _api.Token == sessionToken &&
+                HasRealNamePolicy && _relayTerms == terms && _realNameRules == rules &&
+                _realNamePolicyRevision == policyRevision && ticket is not null && ticket.ExpiresAt > DateTimeOffset.UtcNow;
+            var dialog = DialogService.Instance.Show(new TextDialogRequest
+            {
+                Title = terms.Title,
+                Content = $"条款版本：{terms.Version}\n\n{terms.Content}",
+                Buttons = requiresConfirmation
+                    ? DialogButtons.From("已阅读并同意", "取消")
+                    : DialogButtons.From("关闭"),
+                ReadingConfirmation = requiresConfirmation ? new DialogReadingConfirmation
+                {
+                    MinimumReadSeconds = ticket!.MinimumReadSeconds,
+                    RequireScrollEnd = true,
+                    CanConfirm = CanConfirm
+                } : null
+            });
+            _termsDialog = dialog;
+            var result = await dialog.WaitForCloseAsync().ConfigureAwait(true);
+            if (requiresConfirmation && result.IsConfirmed && CanConfirm())
+            {
+                _confirmedTerms = terms;
+                _termsReadToken = ticket!.ReadToken;
+                _termsReadExpiresAt = ticket.ExpiresAt;
+                _termsSessionToken = sessionToken;
+                LabRealNameTermsStatus.Text = "已确认当前版本服务条款，请分别确认以下授权事项。";
+            }
+        }
+        catch (OperationCanceledException) when (_exiting) { }
+        catch (OperationCanceledException) { SetStatus("获取中继服务条款超时，请稍后重试。"); }
+        catch (Exception ex) { if (!_exiting) SetStatus("无法获取中继服务条款：" + ex.Message); }
+        finally
+        {
+            _termsDialog = null;
+            _loadingTerms = false;
+            if (!_exiting) UpdateButtons();
+        }
+    }
+
+    private void TextRealName_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        _nameCompositionActive = false;
+        e.Handled = !RelayApi.IsAllowedRealNameInput(e.Text);
+        QueueRealNameValidation();
+    }
+
+    private void TextRealName_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_restoringRealName) return;
+        if (!_nameCompositionActive && sender is TextBox textBox && RelayApi.IsAllowedRealNameInput(textBox.Text))
+        {
+            _lastValidRealName = textBox.Text;
+            return;
+        }
+        QueueRealNameValidation();
+    }
+
+    private void QueueRealNameValidation()
+    {
+        if (_nameValidationQueued) return;
+        _nameValidationQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
+        {
+            _nameValidationQueued = false;
+            if (_nameCompositionActive || _exiting) return;
+            if (RelayApi.IsAllowedRealNameInput(TextRealName.Text))
+            {
+                _lastValidRealName = TextRealName.Text;
+                return;
+            }
+            _restoringRealName = true;
+            try
+            {
+                TextRealName.Text = _lastValidRealName;
+                TextRealName.CaretIndex = TextRealName.Text.Length;
+                SetStatus("姓名仅允许填写中文汉字，长度为 2 至 6 个字。");
+            }
+            finally { _restoringRealName = false; }
+        }));
+    }
+
+    private void TextRealName_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        var text = e.DataObject.GetData(DataFormats.UnicodeText) as string;
+        var candidate = text is null ? null : TextRealName.Text.Remove(TextRealName.SelectionStart, TextRealName.SelectionLength)
+            .Insert(TextRealName.SelectionStart, text);
+        if (candidate is not null && RelayApi.IsAllowedRealNameInput(candidate)) return;
+        e.CancelCommand();
+        SetStatus("姓名仅允许填写中文汉字，长度为 2 至 6 个字。");
+    }
+
+    private static bool IsIdentityInputCharacter(char value) => value is >= '0' and <= '9' or 'X' or 'x';
+
+    private void PasswordRealNameId_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (e.Text.Any(value => !IsIdentityInputCharacter(value)))
+        {
+            e.Handled = true;
+            SetStatus("身份证号仅允许填写数字，末位校验码可填写 X。");
+            return;
+        }
+        if (e.Text.Any(value => value is 'X' or 'x'))
+        {
+            using var current = PasswordRealNameId.SecurePassword;
+            if (current.Length < 17)
+            {
+                e.Handled = true;
+                SetStatus("X 仅可作为居民身份证号的第 18 位校验码。");
+                return;
+            }
+        }
+        if (!e.Text.Contains('x')) return;
+        e.Handled = true;
+        TextCompositionManager.StartComposition(new TextComposition(InputManager.Current, PasswordRealNameId, e.Text.ToUpperInvariant()));
+    }
+
+    private void PasswordRealNameId_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        var text = e.DataObject.GetData(DataFormats.UnicodeText) as string;
+        if (text is null || text.Length > 18 || text.Any(value => !IsIdentityInputCharacter(value)))
+        {
+            e.CancelCommand();
+            SetStatus("请粘贴有效的居民身份证号，限 18 位，末位可为 X。");
+            return;
+        }
+        e.DataObject = new DataObject(DataFormats.UnicodeText, text.ToUpperInvariant());
+    }
+
+    private void PasswordRealNameId_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        var box = (PasswordBox)sender;
+        using var value = box.SecurePassword;
+        var chars = new char[value.Length];
+        var pointer = IntPtr.Zero;
+        try
+        {
+            pointer = Marshal.SecureStringToGlobalAllocUnicode(value);
+            Marshal.Copy(pointer, chars, 0, chars.Length);
+            for (var index = 0; index < chars.Length; index++)
+            {
+                if (chars[index] is >= '0' and <= '9' || index == 17 && chars[index] == 'X') continue;
+                box.Clear();
+                if (LabStatus is not null) SetStatus("身份证号前 17 位应为数字，末位应为数字或 X，请重新填写。");
+                break;
+            }
+        }
+        finally
+        {
+            Array.Clear(chars);
+            if (pointer != IntPtr.Zero) Marshal.ZeroFreeGlobalAllocUnicode(pointer);
+        }
+    }
+
+    private void ClearRealNameInput()
+    {
+        _nameCompositionActive = false;
+        _lastValidRealName = string.Empty;
+        TextRealName.Text = string.Empty;
+        PasswordRealNameId.Clear();
+        ResetTermsConfirmation();
+    }
+
+    private void ApplyRealNameUi(string? status, string? maskedId)
+    {
+        if (!_realNameRequired)
+        {
+            BtnRealName.Visibility = Visibility.Collapsed;
+            PanRealName.Visibility = Visibility.Collapsed;
+            _realNameTimer.Stop();
+            return;
+        }
+
+        BtnRealName.Visibility = Visibility.Visible;
+        BtnRealName.Text = _realNameVerified ? "认证已完成" : "实名认证";
+        if (_realNameVerified)
+        {
+            BtnRealName.Visibility = Visibility.Collapsed;
+            PanRealName.Visibility = Visibility.Visible;
+            _realNameTimer.Stop();
+            PanRealNameForm.Visibility = Visibility.Collapsed;
+            ClearRealNameInput();
+            ImgRealNameQr.Source = null;
+            ImgRealNameQr.Visibility = Visibility.Collapsed;
+            LabRealNameStatus.Text = string.IsNullOrWhiteSpace(maskedId)
+                ? "实名认证已完成。经认证的身份资料不可修改，客户端仅提供认证状态及脱敏信息。"
+                : $"实名认证已完成（身份证号：{maskedId}）。经认证的身份资料不可修改。";
+        }
+        else if (IsRealNamePending(status))
+        {
+            LabRealNameStatus.Text = "实名认证申请已受理，请使用支付宝扫描下方二维码完成身份核验。";
+            PanRealNameForm.Visibility = Visibility.Collapsed;
+            if (ImgRealNameQr.Source is not null) ImgRealNameQr.Visibility = Visibility.Visible;
+            _realNameTimer.Start();
+        }
+        else
+        {
+            LabRealNameStatus.Text = string.Equals(status, "expired", StringComparison.OrdinalIgnoreCase)
+                ? "本次身份核验二维码已失效，请核对本人资料后重新提交认证申请。"
+                : "使用中继联机服务前，请完成实名认证。提交前请阅读中继服务条款，了解资料用途及处理方式，并确认授权。";
+            PanRealNameForm.Visibility = Visibility.Visible;
+            ImgRealNameQr.Visibility = Visibility.Collapsed;
+            _realNameTimer.Stop();
+        }
+    }
+
+    private void BtnRealName_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_realNameRequired) return;
+        PanRealName.Visibility = PanRealName.Visibility == Visibility.Visible
+            ? Visibility.Collapsed : Visibility.Visible;
+        if (PanRealName.Visibility == Visibility.Visible && IsRealNamePending(_lastMe?.User.RealNameStatus))
+            _ = RefreshRealNameStatusAsync();
+    }
+
+    private async void BtnRealNameSubmit_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_busy || _exiting || !_session.IsValid || !_realNameRequired || IsRealNameVerified) return;
+        if (!HasRealNamePolicy)
+        {
+            SetStatus("暂未取得有效的实名校验规则或服务条款，请联系服务管理员。");
+            return;
+        }
+        if (!HasConfirmedTerms)
+        {
+            SetStatus("请先完整阅读中继服务条款，并在阅读窗口确认后提交。");
+            return;
+        }
+        if (CheckRealNameSensitiveConsent.Checked != true || CheckRealNameAlipayConsent.Checked != true)
+        {
+            SetStatus("请分别确认敏感个人信息处理授权及向支付宝实名认证服务提供方提供资料的授权。");
+            return;
+        }
+        var acceptedTerms = _confirmedTerms!;
+        var sessionToken = _api.Token;
+        var name = TextRealName.Text.Trim();
+        using var secureId = PasswordRealNameId.SecurePassword;
+        if (!RelayApi.IsValidRealName(name))
+        {
+            SetStatus("请填写本人真实姓名，仅允许 2 至 6 个中文汉字。");
+            return;
+        }
+        if (!ValidateRealNameIdentity(secureId)) return;
+        if (string.IsNullOrWhiteSpace(_realNamePublicKey))
+        {
+            SetStatus("云端未提供实名认证所需的加密公钥，请联系服务管理员。");
+            return;
+        }
+
+        try
+        {
+            SetBusy(true, "正在核对实名认证规则及授权条款…");
+            using var policyTimeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            policyTimeout.CancelAfter(TimeSpan.FromSeconds(8));
+            var latestStatus = await _api.GetStatusAsync(policyTimeout.Token).ConfigureAwait(true);
+            if (_exiting || _api.Token != sessionToken) return;
+            ApplyRealNamePolicy(latestStatus);
+            _realNamePublicKey = latestStatus.RealNamePublicKey;
+            if (!latestStatus.RealNameEnabled || !HasConfirmedTerms || _confirmedTerms != acceptedTerms ||
+                CheckRealNameSensitiveConsent.Checked != true || CheckRealNameAlipayConsent.Checked != true)
+            {
+                SetStatus("实名认证配置或服务条款已更新，请重新阅读并确认授权后提交。");
+                return;
+            }
+            if (!ValidateRealNameIdentity(secureId)) return;
+            if (string.IsNullOrWhiteSpace(_realNamePublicKey))
+            {
+                SetStatus("云端未提供有效的实名认证加密公钥，请联系服务管理员。");
+                return;
+            }
+            SetStatus("正在提交实名认证申请…");
+            var submission = _api.StartRealNameAsync(_realNamePublicKey, name, secureId, acceptedTerms.Version,
+                _termsReadToken!, CheckRealNameSensitiveConsent.Checked == true,
+                CheckRealNameAlipayConsent.Checked == true, _lifetime.Token);
+            secureId.Dispose();
+            name = string.Empty;
+            ClearRealNameInput();
+            var state = await submission.ConfigureAwait(true);
+            if (_exiting || !IsVisible || _api.Token != sessionToken) return;
+            PanRealName.Visibility = Visibility.Visible;
+            await ApplyRealNameStateAsync(state).ConfigureAwait(true);
+            if (IsVerifiedStatus(state.Status))
+            {
+                await RefreshAsync().ConfigureAwait(true);
+                SetStatus("实名认证已完成，可使用中继联机服务。");
+            }
+            else SetStatus("实名认证申请已提交，请使用支付宝扫码完成身份核验。");
+        }
+        catch (OperationCanceledException) when (_exiting) { }
+        catch (Exception ex)
+        {
+            if (!_exiting) SetStatus("提交实名认证失败：" + ex.Message);
+        }
+        finally
+        {
+            ClearRealNameInput();
+            if (!_exiting) SetBusy(false);
+        }
+    }
+
+    private void CheckRealNameConsent_Changed(object sender, bool user)
+    {
+        // XAML 初始化期间，后续命名控件可能尚未创建。
+        if (BtnRealNameSubmit is null || CheckRealNameSensitiveConsent is null || CheckRealNameAlipayConsent is null) return;
+        if (!HasConfirmedTerms)
+        {
+            CheckRealNameSensitiveConsent.Checked = false;
+            CheckRealNameAlipayConsent.Checked = false;
+        }
+        UpdateButtons();
+    }
+
+    private bool ValidateRealNameIdentity(System.Security.SecureString identity)
+    {
+        if (_realNameRules is not { } rules || !RelayApi.IsValidIdentityNumber(identity, rules with { MinimumAge = 0 }))
+        {
+            SetStatus("居民身份证号码校验未通过，请核对号码、出生日期及末位校验码。");
+            return false;
+        }
+        if (RelayApi.IsRealNameMinimumAgeSatisfied(identity, rules)) return true;
+        SetStatus($"根据本服务的准入规则，实名认证申请人须年满 {rules.MinimumAge} 周岁。您目前未达到申请年龄要求。");
+        return false;
+    }
+
+    private async Task RefreshRealNameStatusAsync()
+    {
+        if (_realNamePolling || _exiting || !IsVisible || !_session.IsValid || !_realNameRequired ||
+            IsRealNameVerified || _busy) return;
+        _realNamePolling = true;
+        try
+        {
+            var state = await _api.GetRealNameStatusAsync(_lifetime.Token).ConfigureAwait(true);
+            if (_exiting || !IsVisible) return;
+            await ApplyRealNameStateAsync(state).ConfigureAwait(true);
+            if (IsVerifiedStatus(state.Status))
+            {
+                _realNameVerified = true;
+                await RefreshAsync().ConfigureAwait(true);
+                if (!_exiting) SetStatus("实名认证已完成，可使用中继联机服务。");
+            }
+        }
+        catch (OperationCanceledException) when (_exiting) { }
+        catch (Exception ex)
+        {
+            if (!_exiting && IsVisible) LabRealNameStatus.Text = "查询认证状态失败：" + ex.Message;
+        }
+        finally { _realNamePolling = false; }
+    }
+
+    private async Task ApplyRealNameStateAsync(RelayRealNameState state)
+    {
+        if (_exiting || !IsVisible) return;
+        if (IsVerifiedStatus(state.Status))
+        {
+            _realNameVerified = true;
+            _realNameTimer.Stop();
+            BtnRealName.Visibility = Visibility.Collapsed;
+            PanRealName.Visibility = Visibility.Visible;
+            LabRealNameStatus.Text = string.IsNullOrWhiteSpace(state.MaskedId)
+                ? "实名认证已完成。经认证的身份资料不可修改，客户端仅提供认证状态及脱敏信息。"
+                : $"实名认证已完成（身份证号：{state.MaskedId}）。经认证的身份资料不可修改。";
+            ClearRealNameInput();
+            PanRealNameForm.Visibility = Visibility.Collapsed;
+            ImgRealNameQr.Source = null;
+            ImgRealNameQr.Visibility = Visibility.Collapsed;
+            UpdateButtons();
+            return;
+        }
+
+        if (IsRealNamePending(state.Status) || !string.IsNullOrWhiteSpace(state.QrPng))
+        {
+            LabRealNameStatus.Text = state.ExpiresAt is DateTimeOffset expires
+                ? $"实名认证申请已受理，请使用支付宝扫码完成身份核验。二维码有效期至 {expires.LocalDateTime:yyyy-MM-dd HH:mm}。"
+                : "实名认证申请已受理，请使用支付宝扫描下方二维码完成身份核验。";
+            PanRealNameForm.Visibility = Visibility.Collapsed;
+            if (!string.IsNullOrWhiteSpace(state.QrPng))
+            {
+                try
+                {
+                    var base64 = state.QrPng.Contains(',') ? state.QrPng[(state.QrPng.IndexOf(',') + 1)..] : state.QrPng;
+                    var bytes = Convert.FromBase64String(base64);
+                    using var stream = new MemoryStream(bytes);
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = stream;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    if (_exiting || !IsVisible) return;
+                    ImgRealNameQr.Source = bitmap;
+                    ImgRealNameQr.Visibility = Visibility.Visible;
+                }
+                catch (Exception ex) when (ex is FormatException or IOException or NotSupportedException)
+                {
+                    ImgRealNameQr.Source = null;
+                    ImgRealNameQr.Visibility = Visibility.Collapsed;
+                    LabRealNameStatus.Text = "云端返回的二维码无效，请稍后刷新认证状态。";
+                }
+            }
+            else ImgRealNameQr.Visibility = Visibility.Collapsed;
+            _realNameTimer.Start();
+            return;
+        }
+
+        _realNameTimer.Stop();
+        ImgRealNameQr.Source = null;
+        ImgRealNameQr.Visibility = Visibility.Collapsed;
+        PanRealNameForm.Visibility = Visibility.Visible;
+        LabRealNameStatus.Text = string.Equals(state.Status, "expired", StringComparison.OrdinalIgnoreCase)
+            ? "本次身份核验二维码已失效，请核对本人资料后重新提交认证申请。"
+            : "尚未完成实名认证，请核对本人资料并确认授权后提交认证申请。";
+    }
+
+    private static bool IsVerifiedStatus(string? status) =>
+        status is not null && (status.Equals("verified", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("success", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("passed", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsRealNamePending(string? status) =>
+        status is not null && (status.Equals("pending", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("waiting", StringComparison.OrdinalIgnoreCase) ||
+            status.Equals("processing", StringComparison.OrdinalIgnoreCase));
 
     private void ApplyNodes(IReadOnlyList<RelayNode> nodes)
     {
@@ -534,6 +1091,12 @@ public partial class RelayPanel : UserControl
         if (_banned)
         {
             SetStatus("账号已被封禁，无法创建或加入房间");
+            return false;
+        }
+        if (_realNameRequired && !IsRealNameVerified)
+        {
+            PanRealName.Visibility = Visibility.Visible;
+            SetStatus("请先完成实名认证后再使用中继联机");
             return false;
         }
         if (!_roomsSupported)
@@ -806,7 +1369,10 @@ public partial class RelayPanel : UserControl
     private void OnAppExit()
     {
         _exiting = true;
+        _termsDialog?.Close(DialogResult.None);
+        ResetTermsConfirmation();
         _timer.Stop();
+        _realNameTimer.Stop();
         _lifetime.Cancel();
         var id = _runningAllocationId;
         _host?.Dispose();
@@ -912,6 +1478,13 @@ public partial class RelayPanel : UserControl
 
     private void ShowLogin(bool expired = false)
     {
+        _realNameRequired = false;
+        _realNameVerified = false;
+        _realNameTimer.Stop();
+        BtnRealName.Visibility = Visibility.Collapsed;
+        PanRealName.Visibility = Visibility.Collapsed;
+        ImgRealNameQr.Source = null;
+        ClearRealNameInput();
         PanLogin.Visibility = Visibility.Visible;
         PanQuota.Visibility = Visibility.Collapsed;
         BtnLogout.Visibility = Visibility.Collapsed;
@@ -945,6 +1518,7 @@ public partial class RelayPanel : UserControl
     /// </summary>
     private void ShowRegionBlocked()
     {
+        _realNameTimer.Stop();
         PanLogin.Visibility = Visibility.Collapsed;
         PanQuota.Visibility = Visibility.Collapsed;
         BtnLogout.Visibility = Visibility.Collapsed;
@@ -961,7 +1535,10 @@ public partial class RelayPanel : UserControl
     /// <summary>封禁、没有节点、版本过低、地区受限、正在忙碌时，分配按钮都不能点。</summary>
     private void UpdateButtons()
     {
+        if (_confirmedTerms is not null && !HasConfirmedTerms)
+            ResetTermsConfirmation("条款阅读确认已失效，请重新阅读并确认后提交。");
         var available = _session.IsValid && _relayEnabled && !_busy && !_banned && !_versionTooLow && !_regionBlocked && _roomsSupported &&
+            (!_realNameRequired || IsRealNameVerified) &&
             _host is null && _guest is null && !_exiting;
         BtnAllocate.IsEnabled = available && _hasNodes;
         BtnScan.IsEnabled = available;
@@ -971,6 +1548,16 @@ public partial class RelayPanel : UserControl
         TextRoomCode.IsEnabled = available;
         BtnStop.IsEnabled = !_busy;
         BtnLogout.IsEnabled = !_busy;
+        BtnRealName.IsEnabled = !_busy;
+        var canSubmitRealName = _session.IsValid && !_busy && !_exiting && _realNameRequired && !IsRealNameVerified;
+        TextRealName.IsEnabled = canSubmitRealName && HasRealNamePolicy;
+        PasswordRealNameId.IsEnabled = canSubmitRealName && HasRealNamePolicy;
+        CheckRealNameSensitiveConsent.IsEnabled = canSubmitRealName && !_loadingTerms && HasConfirmedTerms;
+        CheckRealNameAlipayConsent.IsEnabled = canSubmitRealName && !_loadingTerms && HasConfirmedTerms;
+        BtnRealNameTerms.IsEnabled = !_busy && !_loadingTerms && !_exiting;
+        BtnRelayTerms.IsEnabled = !_busy && !_loadingTerms && !_exiting;
+        BtnRealNameSubmit.IsEnabled = canSubmitRealName && !_loadingTerms && HasConfirmedTerms &&
+            CheckRealNameSensitiveConsent.Checked == true && CheckRealNameAlipayConsent.Checked == true;
         // 地区受限时连登录都禁用，避免用户以为登录之后就能用
         BtnRefreshCaptcha.IsEnabled = !_busy && !_regionBlocked;
         BtnSendCode.IsEnabled = !_busy && !_regionBlocked;
@@ -978,6 +1565,8 @@ public partial class RelayPanel : UserControl
     }
 
     private void SetStatus(string text) => LabStatus.Text = text;
+
+    private bool IsRealNameVerified => _realNameVerified || _lastMe?.User.RealNameVerified == true;
 
     private void SetBusy(bool busy, string? status = null)
     {

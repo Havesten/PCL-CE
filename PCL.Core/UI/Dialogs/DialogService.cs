@@ -48,7 +48,8 @@ public sealed class DialogService : IDialogService
         var dialog = _Enqueue(request);
 
         // 单按钮弹窗没有可选分支，显示后立即返回，避免阻塞调用线程。
-        var waitable = request.Buttons.Length > 1;
+        var waitable = request.Buttons.Length > 1 ||
+            request is TextDialogRequest { ReadingConfirmation: not null };
         if (!waitable) dialog.PresetResult(new DialogResult(1));
 
         if (!waitable || !request.ForceWait || dialog.IsClosed) return dialog;
@@ -117,7 +118,12 @@ public sealed class DialogService : IDialogService
 
         lock (_lock)
         {
-            if (_current is not null || _queue.Count == 0) return;
+            if (_current is not null) return;
+            // 排队期间可能因页面隐藏或会话变化被定向取消。
+            // 已关闭的弹窗不能再呈现，否则不会再次触发关闭回调。
+            while (_queue.TryPeek(out var pending) && pending.IsClosed)
+                _queue.Dequeue();
+            if (_queue.Count == 0) return;
             next = _queue.Dequeue();
             _current = next;
         }

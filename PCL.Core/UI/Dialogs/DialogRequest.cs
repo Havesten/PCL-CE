@@ -35,9 +35,22 @@ public abstract record DialogRequest
     public abstract DialogKind Kind { get; }
 }
 
+/// <summary>文本弹窗可选的阅读确认条件；未配置时保持普通弹窗行为。</summary>
+public sealed record DialogReadingConfirmation
+{
+    public int MinimumReadSeconds { get; init; } = 10;
+
+    public bool RequireScrollEnd { get; init; } = true;
+
+    /// <summary>确认前复核条款、会话及业务凭据是否仍有效。</summary>
+    public Func<bool>? CanConfirm { get; init; }
+}
+
 public sealed record TextDialogRequest : DialogRequest
 {
     public required string Content { get; init; }
+
+    public DialogReadingConfirmation? ReadingConfirmation { get; init; }
 
     public override DialogKind Kind => DialogKind.Text;
 }

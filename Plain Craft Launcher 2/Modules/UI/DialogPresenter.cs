@@ -53,6 +53,7 @@ public sealed class DialogPresenter : IDialogPresenter
                 ShowFallback(dialog);
                 return;
             }
+            if (dialog.IsClosed) return;
 
             main.PanMsgBackground.Visibility = Visibility.Visible;
             main.PanMsg.Children.Add(view);
@@ -80,6 +81,12 @@ public sealed class DialogPresenter : IDialogPresenter
 
     public void ShowFallback(DialogViewModel dialog)
     {
+        // A native message box cannot enforce scrolling or the reading interval.
+        if (dialog.Request is TextDialogRequest { ReadingConfirmation: not null })
+        {
+            dialog.Close(DialogResult.None);
+            return;
+        }
         try
         {
             var text = string.IsNullOrEmpty(dialog.TextContent) ? dialog.Title : dialog.TextContent;

@@ -22,6 +22,7 @@
                 <RowDefinition Height="13" />
                 <RowDefinition Height="1*" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" FontSize="23" TextTrimming="None" Foreground="{DynamicResource ColorBrush2}"
                        HorizontalAlignment="Left" Name="LabTitle" Margin="7,-1,70,9" Text="测试标题文本"
@@ -38,7 +39,9 @@
                          IsReadOnly="True" Background="Transparent" BorderThickness="0" AllowDrop="False"
                          VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Disabled" />
             </my:MyScrollViewer>
-            <StackPanel Grid.Row="4" Name="PanBtn" VerticalAlignment="Top" HorizontalAlignment="Right"
+            <TextBlock Grid.Row="4" x:Name="LabReadingStatus" Visibility="Collapsed" Margin="7,0,7,13"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource ColorBrush1}" Opacity="0.75" />
+            <StackPanel Grid.Row="5" Name="PanBtn" VerticalAlignment="Top" HorizontalAlignment="Right"
                         Margin="150,0,8,0" Orientation="Horizontal">
                 <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="测试按钮1" Click="Btn1_Click" x:Name="Btn1"
                              Margin="12,0,0,0"

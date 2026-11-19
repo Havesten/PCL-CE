@@ -1,8 +1,16 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
+using System.Security;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
@@ -80,6 +88,256 @@ public sealed class RelayApi
 
     public async Task<RelayMe> GetMeAsync(CancellationToken ct = default) =>
         await SendAsync<RelayMe>(HttpMethod.Get, "/api/v1/me", null, ct).ConfigureAwait(false);
+
+    /// <summary>编辑姓名时仅允许中文汉字，最多六字；允许空值用于删除输入。</summary>
+    public static bool IsAllowedRealNameInput(string value)
+    {
+        if (value is null) return false;
+        var count = 0;
+        foreach (var rune in value.EnumerateRunes())
+        {
+            var code = rune.Value;
+            if (code != 0x3007 && code is not (>= 0x3400 and <= 0x4DBF) &&
+                code is not (>= 0x4E00 and <= 0x9FFF) && code is not (>= 0xF900 and <= 0xFAFF) &&
+                code is not (>= 0x20000 and <= 0x2FA1F) && code is not (>= 0x30000 and <= 0x323AF))
+                return false;
+            if (code != 0x3007 && Rune.GetUnicodeCategory(rune) != UnicodeCategory.OtherLetter) return false;
+            if (++count > 6) return false;
+        }
+        return true;
+    }
+
+    /// <summary>姓名必须由二至六个中文汉字组成。</summary>
+    public static bool IsValidRealName(string value) =>
+        IsAllowedRealNameInput(value) && value.EnumerateRunes().Count() >= 2;
+
+    /// <summary>编辑身份证号时只允许数字，X 仅可出现在第十八位。</summary>
+    public static bool IsAllowedIdentityInput(string value)
+    {
+        if (value is null || value.Length > 18) return false;
+        for (var i = 0; i < value.Length; i++)
+            if ((value[i] is < '0' or > '9') && !(i == 17 && value[i] is 'X' or 'x')) return false;
+        return true;
+    }
+
+    // 日期上限以中国时区当天及云端下发范围为准，避免客户端时区不同造成当天误判。
+    private static DateOnly RealNameToday => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(8)).DateTime);
+
+    private static bool TryGetRealNameValidationDate(RelayRealNameRules rules, out DateOnly today)
+    {
+        today = RealNameToday;
+        return rules.MinimumAge is >= 0 and <= 150 && (rules.ValidationDate is null ||
+            DateOnly.TryParseExact(rules.ValidationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out today));
+    }
+
+    internal static bool TryGetRealNameBirthRange(RelayRealNameRules rules, out DateOnly minimum, out DateOnly maximum)
+    {
+        minimum = default;
+        maximum = default;
+        if (rules.NameMinLength != 2 || rules.NameMaxLength != 6 || rules.IdentityNumberLength != 18 ||
+            !TryGetRealNameValidationDate(rules, out var today) ||
+            !DateOnly.TryParseExact(rules.BirthDateMin, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out minimum))
+            return false;
+        if (rules.BirthDateMax is null) maximum = today;
+        else if (!DateOnly.TryParseExact(rules.BirthDateMax, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out maximum))
+            return false;
+        return minimum <= maximum && maximum <= today;
+    }
+
+    // 与云端 Go AddDate 保持一致：二月二十九日出生者在非闰年的三月一日达到相应周岁。
+    private static bool MeetsRealNameMinimumAge(DateOnly birthday, RelayRealNameRules rules)
+    {
+        if (!TryGetRealNameValidationDate(rules, out var today) || birthday > today) return false;
+        try
+        {
+            var anniversaryYear = birthday.Year + rules.MinimumAge;
+            var anniversary = birthday.Month == 2 && birthday.Day == 29 && !DateTime.IsLeapYear(anniversaryYear)
+                ? new DateOnly(anniversaryYear, 3, 1)
+                : birthday.AddYears(rules.MinimumAge);
+            return anniversary <= today;
+        }
+        catch (ArgumentOutOfRangeException) { return false; }
+    }
+
+    /// <summary>仅核对身份证出生日期是否达到云端最低周岁；调用前应先验证证件格式。</summary>
+    public static bool IsRealNameMinimumAgeSatisfied(SecureString value, RelayRealNameRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(rules);
+        if (value.Length != 18) return false;
+        var chars = new char[value.Length];
+        var pointer = IntPtr.Zero;
+        try
+        {
+            pointer = Marshal.SecureStringToGlobalAllocUnicode(value);
+            Marshal.Copy(pointer, chars, 0, chars.Length);
+            return DateOnly.TryParseExact(chars.AsSpan(6, 8), "yyyyMMdd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var birthday) && MeetsRealNameMinimumAge(birthday, rules);
+        }
+        finally
+        {
+            Array.Clear(chars);
+            if (pointer != IntPtr.Zero) Marshal.ZeroFreeGlobalAllocUnicode(pointer);
+        }
+    }
+
+    /// <summary>验证十八位身份证号、实际出生日期、云端日期范围与校验位。</summary>
+    public static bool IsValidIdentityNumber(SecureString value, RelayRealNameRules? rules = null)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (value.Length != 18) return false;
+        rules ??= new RelayRealNameRules();
+        if (!TryGetRealNameBirthRange(rules, out var minimum, out var maximum)) return false;
+
+        var chars = new char[value.Length];
+        var pointer = IntPtr.Zero;
+        try
+        {
+            pointer = Marshal.SecureStringToGlobalAllocUnicode(value);
+            Marshal.Copy(pointer, chars, 0, chars.Length);
+            var weightedSum = 0;
+            ReadOnlySpan<int> weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+            const string checkCharacters = "10X98765432";
+            for (var i = 0; i < 17; i++)
+            {
+                if (chars[i] is < '0' or > '9') return false;
+                weightedSum += (chars[i] - '0') * weights[i];
+            }
+            if (chars[0] == '0' || chars[14] == '0' && chars[15] == '0' && chars[16] == '0') return false;
+            if (!rules.AllowChecksumX && char.ToUpperInvariant(chars[17]) == 'X') return false;
+            if (char.ToUpperInvariant(chars[17]) != checkCharacters[weightedSum % 11]) return false;
+
+            var year = (chars[6] - '0') * 1000 + (chars[7] - '0') * 100 + (chars[8] - '0') * 10 + chars[9] - '0';
+            var month = (chars[10] - '0') * 10 + chars[11] - '0';
+            var day = (chars[12] - '0') * 10 + chars[13] - '0';
+            DateOnly birthday;
+            try { birthday = new DateOnly(year, month, day); }
+            catch (ArgumentOutOfRangeException) { return false; }
+            return birthday >= minimum && birthday <= maximum && MeetsRealNameMinimumAge(birthday, rules);
+        }
+        finally
+        {
+            Array.Clear(chars);
+            if (pointer != IntPtr.Zero) Marshal.ZeroFreeGlobalAllocUnicode(pointer);
+        }
+    }
+
+    /// <summary>获取当前条款及阅读凭据；不提交任何实名资料。</summary>
+    public Task<RelayRealNameTermsRead> OpenRealNameTermsAsync(string termsVersion, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(termsVersion);
+        return SendAsync<RelayRealNameTermsRead>(HttpMethod.Post, "/api/v1/relay/real-name/terms/read",
+            new { terms_version = termsVersion }, ct);
+    }
+
+    /// <summary>提交使用 AES-GCM + 云端 RSA 公钥封装的实名信息；要求阅读凭据及两项独立授权。</summary>
+    public Task<RelayRealNameState> StartRealNameAsync(string publicKeyBase64, string name,
+        SecureString identityNumber, string termsVersion, string termsReadToken,
+        bool sensitiveDataConsented, bool alipayDataConsented, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(identityNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(termsVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(termsReadToken);
+        if (!sensitiveDataConsented) throw new ArgumentException("请单独确认实名敏感个人信息处理授权。", nameof(sensitiveDataConsented));
+        if (!alipayDataConsented) throw new ArgumentException(
+            "请单独确认向支付宝认证服务提供方提供实名资料的授权。", nameof(alipayDataConsented));
+        if (!IsValidRealName(name)) throw new ArgumentException("姓名须为二至六个中文汉字。", nameof(name));
+        if (identityNumber.Length != 18) throw new ArgumentException("身份证号码须为十八位。", nameof(identityNumber));
+        var envelope = EncryptRealNamePayload(publicKeyBase64, name, identityNumber);
+        return SendAsync<RelayRealNameState>(HttpMethod.Post, "/api/v1/relay/real-name/start",
+            new
+            {
+                encrypted_key = envelope.EncryptedKey,
+                nonce = envelope.Nonce,
+                ciphertext = envelope.Ciphertext,
+                consented = true,
+                terms_version = termsVersion,
+                terms_read_token = termsReadToken,
+                terms_read_confirmed = true,
+                sensitive_data_consented = sensitiveDataConsented,
+                alipay_data_consented = alipayDataConsented
+            }, ct);
+    }
+
+    /// <summary>查询扫码认证进度。返回数据不包含身份证明文。</summary>
+    public async Task<RelayRealNameState> GetRealNameStatusAsync(CancellationToken ct = default) =>
+        await SendAsync<RelayRealNameState>(HttpMethod.Post, "/api/v1/relay/real-name/status", new { }, ct)
+            .ConfigureAwait(false);
+
+    private static RealNameEnvelope EncryptRealNamePayload(string publicKeyBase64, string name, SecureString identityNumber)
+    {
+        ArgumentNullException.ThrowIfNull(identityNumber);
+        var identityChars = new char[identityNumber.Length];
+        var identityPointer = IntPtr.Zero;
+        byte[]? key = null;
+        byte[]? nonce = null;
+        byte[]? ciphertext = null;
+        byte[]? tag = null;
+        byte[]? combinedCiphertext = null;
+        byte[]? wrappedKey = null;
+        byte[]? publicKey = null;
+        ArrayBufferWriter<byte>? jsonBuffer = null;
+        try
+        {
+            identityPointer = Marshal.SecureStringToGlobalAllocUnicode(identityNumber);
+            Marshal.Copy(identityPointer, identityChars, 0, identityChars.Length);
+            jsonBuffer = new ArrayBufferWriter<byte>(512);
+            using (var writer = new Utf8JsonWriter(jsonBuffer, new JsonWriterOptions { SkipValidation = false }))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("name", name);
+                writer.WriteString("identity_number", identityChars.AsSpan());
+                writer.WriteEndObject();
+            }
+
+            // AES-GCM carries the variable-length JSON payload; RSA only wraps the fixed-size AES key.
+            key = RandomNumberGenerator.GetBytes(32);
+            nonce = RandomNumberGenerator.GetBytes(12);
+            ciphertext = new byte[jsonBuffer.WrittenCount];
+            tag = new byte[16];
+            using (var aes = new AesGcm(key, tag.Length))
+                aes.Encrypt(nonce, jsonBuffer.WrittenSpan, ciphertext, tag);
+
+            using var rsa = RSA.Create();
+            publicKey = Convert.FromBase64String(publicKeyBase64);
+            rsa.ImportSubjectPublicKeyInfo(publicKey, out var bytesRead);
+            if (bytesRead != publicKey.Length) throw new CryptographicException("实名公钥格式无效");
+            wrappedKey = rsa.Encrypt(key, RSAEncryptionPadding.OaepSHA256);
+
+            // The ciphertext field is ciphertext bytes followed by the 16-byte GCM tag.
+            combinedCiphertext = new byte[ciphertext.Length + tag.Length];
+            ciphertext.CopyTo(combinedCiphertext, 0);
+            tag.CopyTo(combinedCiphertext, ciphertext.Length);
+            return new RealNameEnvelope(
+                Convert.ToBase64String(wrappedKey),
+                Convert.ToBase64String(nonce),
+                Convert.ToBase64String(combinedCiphertext));
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidOperationException("云端实名公钥格式无效，请联系管理员", ex);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException("无法加密实名信息，请更新客户端或联系管理员", ex);
+        }
+        finally
+        {
+            Array.Clear(identityChars);
+            if (identityPointer != IntPtr.Zero) Marshal.ZeroFreeGlobalAllocUnicode(identityPointer);
+            if (key is not null) CryptographicOperations.ZeroMemory(key);
+            if (publicKey is not null) CryptographicOperations.ZeroMemory(publicKey);
+            if (ciphertext is not null) CryptographicOperations.ZeroMemory(ciphertext);
+            if (tag is not null) CryptographicOperations.ZeroMemory(tag);
+            if (combinedCiphertext is not null) CryptographicOperations.ZeroMemory(combinedCiphertext);
+            if (nonce is not null) CryptographicOperations.ZeroMemory(nonce);
+            if (wrappedKey is not null) CryptographicOperations.ZeroMemory(wrappedKey);
+            if (jsonBuffer is not null && MemoryMarshal.TryGetArray(jsonBuffer.WrittenMemory, out var jsonSegment))
+                CryptographicOperations.ZeroMemory(jsonSegment.AsSpan());
+        }
+    }
+
+    private sealed record RealNameEnvelope(string EncryptedKey, string Nonce, string Ciphertext);
 
     /// <summary>
     ///     发送绑定手机号的短信验证码（需已登录 + 人机验证）。
@@ -317,6 +575,28 @@ public sealed class RelayApi
         // 服务端按来源 IP 判定不在中国大陆时返回；文案由服务端下发，这里只是兜底
         "region_blocked" => "当前可能位于非中国大陆地区，暂时无法使用此功能",
         "unauthorized" => "登录已失效，请重新登录",
+        "real_name_required" => "使用中继联机服务前，请先完成实名认证。",
+        "real_name_disabled" => "实名认证服务暂未启用，请联系服务提供方。",
+        "real_name_provider_unconfigured" => "实名认证服务尚未配置完成，请联系服务提供方。",
+        "real_name_policy_unavailable" => "实名认证规则暂不可用，请稍后重试或联系服务管理员。",
+        "real_name_locked_or_pending" => "认证已完成或正在处理中，暂不接受重复提交。",
+        "real_name_consent_required" => "请先阅读中继服务条款并明确同意实名资料授权。",
+        "relay_terms_changed" => "中继服务条款已更新，请重新阅读并确认同意后提交。",
+        "relay_terms_read_required" => "请重新打开并完整阅读中继服务条款，确认后再提交实名认证。",
+        "relay_terms_read_too_short" => "条款阅读时间尚未达到要求，请在倒计时结束后确认。",
+        "relay_terms_read_limited" => "当前条款阅读请求较多，请稍后重试。",
+        "real_name_sensitive_consent_required" => "请单独确认实名敏感个人信息处理授权。",
+        "real_name_alipay_consent_required" => "请单独确认向支付宝认证服务提供方提供实名资料的授权。",
+        "invalid_real_name" => "姓名须为二至六个中文汉字。",
+        "invalid_identity_number" => "身份证号码格式不正确，请核对出生日期、顺序码及末位校验码。",
+        "identity_birth_date_out_of_range" => "身份证出生日期不在服务允许范围内，请核对资料或联系服务提供方。",
+        "identity_age_below_minimum" => "根据当前服务规则，您尚未达到实名认证最低年龄要求。",
+        "real_name_interval_limited" => "实名申请提交过于频繁，请稍后重试。",
+        "real_name_daily_limited" => "本账号今日实名申请次数已达上限，请于次日重试。",
+        "real_name_ip_limited" => "当前网络实名申请次数已达上限，请稍后重试。",
+        "real_name_provider_failed" => "实名认证服务暂时不可用，请稍后重试。",
+        "real_name_state_changed" => "认证状态已变更，请刷新后重试。",
+        "real_name_state_persist_failed" => "认证状态暂时无法保存，请稍后重试。",
         _ => status == HttpStatusCode.Unauthorized ? "登录已失效，请重新登录" : $"请求失败（{code}）"
     };
 }

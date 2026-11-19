@@ -1,10 +1,10 @@
 {
   "name": "PCLCE-NS",
   "version": {
-    "base": "3.2.1",
+    "base": "3.2.2",
     "upstream": "2.12.1",
     "suffix": "",
-    "code": 537
+    "code": 538
   },
   "licenses": [
     {

@@ -35,6 +35,7 @@ public sealed record RelayQuota(
         MonthlyTrafficBytes <= 0 ? 0 : Math.Clamp((double)UsedTrafficBytes / MonthlyTrafficBytes, 0, 1);
 }
 
+/// <summary>客户端账号视图；Phone 与 RealNameIdMasked 只承载云端返回的脱敏资料。</summary>
 public sealed record RelayUser(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string Email,
@@ -42,7 +43,11 @@ public sealed record RelayUser(
     [property: JsonPropertyName("banned")] bool Banned = false,
     [property: JsonPropertyName("phone")] string? Phone = null,
     [property: JsonPropertyName("phone_bound")] bool PhoneBound = false,
-    [property: JsonPropertyName("phone_bound_at")] DateTimeOffset? PhoneBoundAt = null);
+    [property: JsonPropertyName("phone_bound_at")] DateTimeOffset? PhoneBoundAt = null,
+    [property: JsonPropertyName("real_name_enabled")] bool? RealNameEnabled = null,
+    [property: JsonPropertyName("real_name_status")] string? RealNameStatus = null,
+    [property: JsonPropertyName("real_name_verified")] bool RealNameVerified = false,
+    [property: JsonPropertyName("real_name_id_masked")] string? RealNameIdMasked = null);
 
 public sealed record RelayLoginResult(
     [property: JsonPropertyName("token")] string Token,
@@ -145,7 +150,47 @@ public sealed record RelayStatus(
     [property: JsonPropertyName("room_code_prefix")] string? RoomCodePrefix = null,
     [property: JsonPropertyName("p2p_enabled")] bool P2pEnabled = true,
     [property: JsonPropertyName("relay_enabled")] bool RelayEnabled = true,
-    [property: JsonPropertyName("p2p_room_codes")] bool P2pRoomCodes = false);
+    [property: JsonPropertyName("p2p_room_codes")] bool P2pRoomCodes = false,
+    [property: JsonPropertyName("real_name_enabled")] bool RealNameEnabled = false,
+    [property: JsonPropertyName("real_name_public_key")] string? RealNamePublicKey = null,
+    [property: JsonPropertyName("real_name_rules")] RelayRealNameRules? RealNameRules = null,
+    [property: JsonPropertyName("relay_terms")] RelayServiceTerms? RelayTerms = null);
+
+/// <summary>云端下发的实名格式、出生日期及最低周岁规则；资料提交仍由云端再次验证。</summary>
+public sealed record RelayRealNameRules(
+    [property: JsonPropertyName("name_min_length")] int NameMinLength = 2,
+    [property: JsonPropertyName("name_max_length")] int NameMaxLength = 6,
+    [property: JsonPropertyName("identity_number_length")] int IdentityNumberLength = 18,
+    [property: JsonPropertyName("allow_checksum_x")] bool AllowChecksumX = true,
+    [property: JsonPropertyName("birth_date_min")] string BirthDateMin = "1900-01-01",
+    [property: JsonPropertyName("birth_date_max")] string? BirthDateMax = null,
+    [property: JsonPropertyName("minimum_age")] int MinimumAge = 0,
+    [property: JsonPropertyName("validation_date")] string? ValidationDate = null)
+{
+    [JsonIgnore]
+    public bool IsValidConfiguration => BirthDateMax is not null && ValidationDate is not null &&
+        RelayApi.TryGetRealNameBirthRange(this, out _, out _);
+}
+
+/// <summary>中继服务条款原文与版本，由云端后台维护。</summary>
+public sealed record RelayServiceTerms(
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("content")] string Content);
+
+/// <summary>绑定当前用户及条款版本的阅读凭据；实名提交时由云端复核最短阅读时长。</summary>
+public sealed record RelayRealNameTermsRead(
+    [property: JsonPropertyName("terms")] RelayServiceTerms Terms,
+    [property: JsonPropertyName("read_token")] string ReadToken,
+    [property: JsonPropertyName("minimum_read_seconds")] int MinimumReadSeconds,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt);
+
+/// <summary>实名提交、扫码进度查询的服务端状态；不会包含身份证明文。</summary>
+public sealed record RelayRealNameState(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("qr_png")] string? QrPng,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset? ExpiresAt,
+    [property: JsonPropertyName("masked_id")] string? MaskedId);
 
 internal sealed record RelayErrorBody(
     [property: JsonPropertyName("error")] string? Error,
@@ -158,11 +203,12 @@ internal sealed record RelaySendCodeResult(
     [property: JsonPropertyName("ttl")] int Ttl,
     [property: JsonPropertyName("dev_code")] string? DevCode);
 
-/// <summary>绑定手机号接口的返回，phone 字段为绑定后的号码状态。</summary>
+/// <summary>绑定手机号接口的返回，phone 字段为绑定后的脱敏号码状态。</summary>
 internal sealed record RelaySmsBindResult(
     [property: JsonPropertyName("ok")] bool Ok,
     [property: JsonPropertyName("phone")] RelayPhoneState? Phone);
 
+/// <summary>手机绑定状态；Phone 只包含脱敏号码，不提供完整手机号。</summary>
 public sealed record RelayPhoneState(
     [property: JsonPropertyName("phone")] string Phone,
     [property: JsonPropertyName("bound")] bool Bound,

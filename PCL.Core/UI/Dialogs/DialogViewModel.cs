@@ -73,6 +73,9 @@ public sealed partial class DialogViewModel : ObservableObject
     internal TaskCompletionSource<DialogResult> Completion { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>等待本弹窗实际关闭，可与持有状态对象的定向取消配合使用。</summary>
+    public Task<DialogResult> WaitForCloseAsync() => Completion.Task;
+
     private DispatcherFrame? _waitFrame;
 
     /// <summary>同步入口用于等待弹窗关闭的消息泵。首次访问时必须位于界面线程。</summary>

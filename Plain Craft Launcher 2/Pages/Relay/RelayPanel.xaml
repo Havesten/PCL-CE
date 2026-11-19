@@ -33,6 +33,9 @@
                     <local:MyButton x:Name="BtnBindPhone" DockPanel.Dock="Right" Text="绑定手机号"
                                     ColorType="Highlight" Width="96" Margin="0,0,8,0" VerticalAlignment="Center"
                                     Visibility="Collapsed" Click="BtnBindPhone_Click" />
+                    <local:MyButton x:Name="BtnRealName" DockPanel.Dock="Right" Text="实名认证"
+                                    ColorType="Highlight" Width="96" Margin="0,0,8,0" VerticalAlignment="Center"
+                                    Visibility="Collapsed" Click="BtnRealName_Click" />
                     <StackPanel VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
                             <!-- 状态点：未登录灰、已登录绿、已过期橙、已封禁红 -->
@@ -45,6 +48,39 @@
                                    Margin="16,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>
                 </DockPanel>
+                <StackPanel x:Name="PanRealName" Margin="0,12,0,0" Visibility="Collapsed">
+                    <TextBlock x:Name="LabRealNameStatus" TextWrapping="Wrap" Opacity="0.75" />
+                    <StackPanel x:Name="PanRealNameForm" Margin="0,10,0,0" Visibility="Collapsed">
+                        <DockPanel Height="28" Margin="0,0,0,8">
+                            <TextBlock DockPanel.Dock="Left" Text="真实姓名" Width="70" VerticalAlignment="Center" Opacity="0.75" />
+                            <!-- 一个扩展汉字可占两个 UTF-16 代码单元，实际字数由 Rune 校验限制为 2 至 6 个。 -->
+                            <local:MyTextBox x:Name="TextRealName" MaxLength="12" MaxLines="1" AcceptsReturn="False"
+                                             AllowDrop="False" HintText="请输入 2 至 6 个汉字"
+                                             PreviewTextInput="TextRealName_PreviewTextInput" TextChanged="TextRealName_TextChanged" />
+                        </DockPanel>
+                        <DockPanel Height="28" Margin="0,0,0,8">
+                            <TextBlock DockPanel.Dock="Left" Text="身份证号" Width="70" VerticalAlignment="Center" Opacity="0.75" />
+                            <PasswordBox x:Name="PasswordRealNameId" MaxLength="18" AllowDrop="False"
+                                         InputMethod.IsInputMethodEnabled="False"
+                                         PreviewTextInput="PasswordRealNameId_PreviewTextInput"
+                                         PasswordChanged="PasswordRealNameId_PasswordChanged" />
+                        </DockPanel>
+                        <local:MyTextButton x:Name="BtnRealNameTerms" Text="阅读并确认中继服务条款及个人信息处理说明"
+                                            HorizontalAlignment="Left" Margin="0,0,0,6" Click="BtnRelayTerms_Click" />
+                        <TextBlock x:Name="LabRealNameTermsStatus" Text="请先阅读并确认条款，再分别确认以下授权事项。"
+                                   Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,10" FontSize="12" />
+                        <local:MyCheckBox x:Name="CheckRealNameSensitiveConsent" Margin="0,0,0,8" Checked="False" IsEnabled="False"
+                                          Change="CheckRealNameConsent_Changed"
+                                          Text="本人已阅读实名认证个人信息处理说明，单独同意服务运营方为身份核验及中继服务准入管理，处理本人姓名、居民身份证号码和必要认证记录。本人知悉相关资料将加密传输及存储，授权管理员可在权限控制及审计下查看；认证成功后客户端不可自行修改。" />
+                        <local:MyCheckBox x:Name="CheckRealNameAlipayConsent" Margin="0,0,0,10" Checked="False" IsEnabled="False"
+                                          Change="CheckRealNameConsent_Changed"
+                                          Text="本人单独同意服务运营方向支付宝实名认证服务提供方提供本人姓名及居民身份证号码，用于完成实名认证，并已知悉接收方的处理目的、信息种类及相关个人信息处理规则。" />
+                        <local:MyButton x:Name="BtnRealNameSubmit" Text="提交实名" Width="100" IsEnabled="False"
+                                        HorizontalAlignment="Left" ColorType="Highlight" Click="BtnRealNameSubmit_Click" />
+                    </StackPanel>
+                    <Image x:Name="ImgRealNameQr" Width="220" Height="220" Margin="0,10,0,0"
+                           HorizontalAlignment="Left" Stretch="Uniform" Visibility="Collapsed" />
+                </StackPanel>
             </StackPanel>
         </local:MyCard>
 
@@ -190,8 +226,9 @@
                 </ListBox>
             </StackPanel>
         </local:MyCard>
-        <TextBlock Text="中继联机服务说明" FontWeight="SemiBold" Opacity="0.65" Margin="5,8,5,0" />
-        <TextBlock Text="本中继联机服务由独立服务提供方运营，与 PCLCE 官方及龙腾猫跃无关。服务可用性、账号与使用限制由服务提供方负责；联机问题请联系本服务维护者。"
+        <local:MyTextButton x:Name="BtnRelayTerms" Text="中继服务条款" HorizontalAlignment="Left"
+                            Margin="5,8,5,0" Click="BtnRelayTerms_Click" />
+        <TextBlock Text="本中继联机服务由独立服务提供方运营，与 PCLCE 官方及龙腾猫跃无关。服务提供方负责服务可用性及账号使用管理。服务使用与个人信息处理事项详见中继服务条款。"
                    TextWrapping="Wrap" Opacity="0.55" FontSize="12" Margin="5,8,5,15" />
     </StackPanel>
 </UserControl>
